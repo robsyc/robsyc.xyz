@@ -9,7 +9,7 @@ My personal website!
 - [shadcn-svelte]()
 - [SvelteFlow]()
 
-
+TODO: add comments about RDF format negotiation
 
 ## Developing
 
