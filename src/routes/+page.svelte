@@ -8,7 +8,7 @@
     } from '@xyflow/svelte';
     
     // Import our flow data
-    import { initialNodes, initialEdges } from '$lib/data/flow-data';
+    import { initialNodes, initialEdges } from '$lib/flow-data';
     
     // Import our theme utility
     import { flowColorMode } from '$lib/utils/theme';

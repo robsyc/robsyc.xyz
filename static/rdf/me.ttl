@@ -29,6 +29,6 @@
     schema:provider <https://www.wikidata.org/wiki/Q1137665>;
     schema:hasCourseInstance <https://pietercolpaert.be/teaching/kg/#2024-2025>.
 
-<https://pietercolpaert.be/teaching/kg/#2024-2025> a schema:courseInstance;
+<https://pietercolpaert.be/teaching/kg/#2024-2025> a schema:CourseInstance;
     schema:instructor <https://pietercolpaert.be#me>;
     schema:attendee <https://robsyc.xyz#me>.
