@@ -14,6 +14,7 @@
     schema:affiliation <https://www.wikidata.org/wiki/Q1137665>; # Ghent University (CollegeOrUniversity)
     
     schema:knows 
+        <https://pietercolpaert.be#me>,
         <https://sandervandamme.com#me>,
         <https://www.ebisi.be/stijndeknudt>,
         <http://lippelo.me/#erwin.geeraerts>,

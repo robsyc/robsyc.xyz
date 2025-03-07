@@ -40,6 +40,9 @@
             },
             "schema:knows": [
                 {
+                    "@id": "https://pietercolpaert.be#me"
+                },
+                {
                     "@id": "https://sandervandamme.com#me"
                 },
                 {
