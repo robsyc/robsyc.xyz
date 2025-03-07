@@ -136,6 +136,7 @@ export const GET: RequestHandler = async ({ request, fetch }) => {
     return new Response(null, {
         status: 200,
         headers: {
+            'Content-Type': 'text/html; charset=utf-8',
             'Link': generateLinkHeaders(),
             ...commonHeaders
         }
@@ -148,6 +149,7 @@ export const OPTIONS: RequestHandler = async () => {
     
     return new Response(null, {
         headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
             'Allow': 'GET, OPTIONS',
             'Accept': supportedTypes,
             'Vary': 'Accept',
