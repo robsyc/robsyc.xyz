@@ -13,7 +13,7 @@ My personal website!
 
 This website implements content negotiation to serve RDF data in different formats:
 
-- **HTML**: Default format for browsers
+- **HTML**: Default format for browsers - uses [SvelteFlow](https://svelteflow.dev/) to render the linked data dynamically
 - **Turtle**: Available at `/rdf/me.ttl` or via content negotiation with `Accept: text/turtle`
 - **JSON-LD**: Available at `/rdf/me.jsonld` or via content negotiation with `Accept: application/ld+json`
 
@@ -29,17 +29,14 @@ The site implements CORS headers to allow cross-origin requests from any domain,
 You can test the content negotiation with curl:
 
 ```bash
-# Get HTML representation
-curl -H "Accept: text/html" https://www.robsyc.xyz/
-
-# Get Turtle representation
-curl -H "Accept: text/turtle" https://www.robsyc.xyz/
-
-# Get JSON-LD representation
-curl -H "Accept: application/ld+json" https://www.robsyc.xyz/
+# Get the headers
+curl -I https://www.robsyc.xyz/
 
 # Check available formats with OPTIONS
 curl -X OPTIONS -i https://www.robsyc.xyz/
+
+# Get Turtle representation with content negotiation (with JSON-LD as fallback)
+curl -H "Accept: text/turtle,application/ld+json;q=0.9" https://www.robsyc.xyz/
 ```
 
 ## Developing

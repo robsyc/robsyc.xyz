@@ -44,6 +44,21 @@
                 },
                 {
                     "@id": "https://www.ebisi.be/stijndeknudt"
+                },
+                {
+                    "@id": "http://lippelo.me/#erwin.geeraerts"
+                },
+                {
+                    "@id": "https://gc-cc.github.io/#me"
+                },
+                {
+                    "@id": "https://tobiashendrickx.be/about#me"
+                },
+                {
+                    "@id": "https://bavop.github.io/rep/#me"
+                },
+                {
+                    "@id": "https://ginfinai.be/#me"
                 }
             ]
         },
