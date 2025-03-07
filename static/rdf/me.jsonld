@@ -1,7 +1,7 @@
 {
     "@context": {
-        "schema": "http://schema.org/",
-        "xsd": "http://www.w3.org/2001/XMLSchema#"
+        "schema": "https://schema.org/",
+        "xsd": "https://www.w3.org/2001/XMLSchema#"
     },
     "@graph": [
         {

@@ -1,5 +1,5 @@
-@prefix schema: <http://schema.org/>.
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+@prefix schema: <https://schema.org/>.
+@prefix xsd: <https://www.w3.org/2001/XMLSchema#>.
 # https://lov.linkeddata.es/dataset/lov
 
 <https://www.robsyc.xyz#me> a schema:Person;
