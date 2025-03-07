@@ -32,6 +32,17 @@ function isRdfConfig(config: ContentTypeConfig): config is RdfContentTypeConfig 
     return 'path' in config;
 }
 
+// Generate common CORS headers for all responses
+function getCorsHeaders(): Record<string, string> {
+    return {
+        'Access-Control-Allow-Origin': '*', // Allow requests from any origin
+        'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS methods
+        'Access-Control-Allow-Headers': 'Accept, Content-Type', // Allow these headers in requests
+        'Access-Control-Expose-Headers': 'Link, Content-Type, Vary', // Expose these headers to clients
+        'Access-Control-Max-Age': '86400' // Cache preflight requests for 24 hours
+    };
+}
+
 // Parse Accept header and determine the best content type to serve
 function negotiateContentType(acceptHeader: string): string {
     if (!acceptHeader) {
@@ -92,7 +103,8 @@ export const GET: RequestHandler = async ({ request, fetch }) => {
     
     // Common headers for all responses
     const commonHeaders = {
-        'Vary': 'Accept'
+        'Vary': 'Accept',
+        ...getCorsHeaders() // Add CORS headers to all responses
     };
     
     // If the negotiated type is not HTML, serve the appropriate RDF format
@@ -139,7 +151,8 @@ export const OPTIONS: RequestHandler = async () => {
             'Allow': 'GET, OPTIONS',
             'Accept': supportedTypes,
             'Vary': 'Accept',
-            'Link': generateLinkHeaders()
+            'Link': generateLinkHeaders(),
+            ...getCorsHeaders() // Add CORS headers to OPTIONS response
         }
     });
 }; 
