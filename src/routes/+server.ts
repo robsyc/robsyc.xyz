@@ -3,31 +3,34 @@ import {
     CONTENT_TYPES,
     isRdfConfig,
     negotiateContentType,
-    buildRdfResponse,
     buildHtmlResponse,
-    buildNotFoundResponse,
     buildOptionsResponse
 } from '$lib/content-negotiation';
 
 /**
  * Handle GET requests with content negotiation
- * Serves different content types based on the Accept header
+ * Due to Vercel CDN limitations with the Vary header, we redirect to specific URLs
+ * instead of serving different content types based on the Accept header.
  */
-export const GET: RequestHandler = async ({ request, fetch }) => {
+export const GET: RequestHandler = async ({ request, url }) => {
+    // Only apply content negotiation for the root URL
+    if (url.pathname !== '/') {
+        return buildHtmlResponse();
+    }
+
     const acceptHeader = request.headers.get('Accept') || '';
     const bestType = negotiateContentType(acceptHeader);
     
-    // If the negotiated type is not HTML, serve the appropriate RDF format
+    // If the negotiated type is not HTML, redirect to the appropriate URL
     const config = CONTENT_TYPES[bestType];
     if (bestType !== 'text/html' && isRdfConfig(config)) {
-        const response = await fetch(config.path);
-        
-        if (!response.ok) {
-            return buildNotFoundResponse(`${bestType} data not found`);
-        }
-        
-        const content = await response.text();
-        return buildRdfResponse(content, bestType);
+        return new Response(null, {
+            status: 302, // Temporary redirect
+            headers: {
+                'Location': config.path,
+                'Cache-Control': 'no-store'
+            }
+        });
     }
     
     // For HTML requests, let SvelteKit handle the normal page rendering

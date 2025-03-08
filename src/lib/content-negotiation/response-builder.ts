@@ -4,12 +4,7 @@
  */
 
 import { getCorsHeaders } from './cors';
-import { 
-    getSupportedContentTypes, 
-    CONTENT_TYPES, 
-    CACHE_DURATIONS,
-    getCacheControlHeader
-} from './config';
+import { getSupportedContentTypes } from './config';
 
 // Common headers for all responses
 const getCommonHeaders = () => ({
@@ -24,13 +19,9 @@ const getCommonHeaders = () => ({
  * @returns A Response object with appropriate headers
  */
 export function buildRdfResponse(content: string, contentType: string): Response {
-    const config = CONTENT_TYPES[contentType];
-    const maxAge = config && 'maxAge' in config ? config.maxAge : CACHE_DURATIONS.RDF;
-    
     return new Response(content, {
         headers: {
             'Content-Type': `${contentType}; charset=utf-8`,
-            'Cache-Control': getCacheControlHeader(maxAge),
             ...getCommonHeaders()
         }
     });
@@ -41,14 +32,10 @@ export function buildRdfResponse(content: string, contentType: string): Response
  * @returns A Response object with appropriate headers
  */
 export function buildHtmlResponse(): Response {
-    const config = CONTENT_TYPES['text/html'];
-    const maxAge = config && 'maxAge' in config ? config.maxAge : CACHE_DURATIONS.HTML;
-    
     return new Response(null, {
         status: 200,
         headers: {
             'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': getCacheControlHeader(maxAge),
             ...getCommonHeaders()
         }
     });
@@ -79,7 +66,6 @@ export function buildOptionsResponse(): Response {
             'Content-Type': 'text/plain; charset=utf-8',
             'Allow': 'GET, OPTIONS',
             'Accept': getSupportedContentTypes(),
-            'Cache-Control': getCacheControlHeader(CACHE_DURATIONS.OPTIONS),
             'Vary': 'Accept',
             ...getCorsHeaders()
         }

@@ -11,7 +11,7 @@ My personal website!
 
 ## Linked Data Support
 
-This website implements content negotiation to serve RDF data in different formats:
+This website implements content negotiation (w/ CORS) to serve RDF data in different formats:
 
 - **HTML**: Default format for browsers - uses [SvelteFlow](https://svelteflow.dev/) to render the linked data dynamically
 - **Turtle**: Available at `/rdf/me.ttl` or via content negotiation with `Accept: text/turtle`
