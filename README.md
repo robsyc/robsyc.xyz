@@ -6,8 +6,8 @@ My personal website!
 
 - [SvelteKit with Svelte 5](https://svelte.dev/)
 - [Tailwind CSS](https://tailwindcss.com/)
-- [shadcn-svelte]()
-- [SvelteFlow]()
+- [shadcn-svelte](https://www.shadcn-svelte.com/)
+- [SvelteFlow](https://svelteflow.dev/)
 
 ## Linked Data Support
 
