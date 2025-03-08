@@ -1,95 +1,21 @@
 import type { RequestHandler } from './$types';
+import {
+    CONTENT_TYPES,
+    isRdfConfig,
+    negotiateContentType,
+    buildRdfResponse,
+    buildHtmlResponse,
+    buildNotFoundResponse,
+    buildOptionsResponse
+} from '$lib/content-negotiation';
 
-// Define types for our content type configurations
-type RdfContentTypeConfig = {
-    path: string;
-    extension: string;
-};
-
-type HtmlContentTypeConfig = {
-    isDefault: boolean;
-};
-
-type ContentTypeConfig = RdfContentTypeConfig | HtmlContentTypeConfig;
-
-// Define supported content types and their file paths
-const CONTENT_TYPES: Record<string, ContentTypeConfig> = {
-    'text/turtle': {
-        path: '/rdf/me.ttl',
-        extension: 'ttl'
-    },
-    'application/ld+json': {
-        path: '/rdf/me.jsonld',
-        extension: 'jsonld'
-    },
-    'text/html': {
-        isDefault: true
-    }
-};
-
-// Type guard to check if a config is an RDF config
-function isRdfConfig(config: ContentTypeConfig): config is RdfContentTypeConfig {
-    return 'path' in config;
-}
-
-// Generate common CORS headers for all responses
-function getCorsHeaders(): Record<string, string> {
-    return {
-        'Access-Control-Allow-Origin': '*' // Allow requests from any origin
-    };
-}
-
-// Parse Accept header and determine the best content type to serve
-function negotiateContentType(acceptHeader: string): string {
-    if (!acceptHeader) {
-        return 'text/html';
-    }
-
-    // Parse the Accept header into content types with their q-values
-    const acceptedTypes = acceptHeader.split(',')
-        .map(item => {
-            const [type, ...params] = item.trim().split(';');
-            // Default q-value is 1.0 if not specified
-            const qParam = params.find(p => p.trim().startsWith('q='));
-            const q = qParam ? parseFloat(qParam.split('=')[1]) : 1.0;
-            return { type: type.trim(), q };
-        })
-        .sort((a, b) => b.q - a.q); // Sort by q-value, highest first
-
-    // Find the first accepted type that we support
-    for (const { type } of acceptedTypes) {
-        // Check for exact match
-        if (type in CONTENT_TYPES) {
-            return type;
-        }
-        
-        // Check for wildcard matches
-        if (type === '*/*') {
-            return 'text/html';
-        }
-        
-        if (type === 'text/*' && 'text/turtle' in CONTENT_TYPES) {
-            return 'text/turtle';
-        }
-        
-        if (type === 'application/*' && 'application/ld+json' in CONTENT_TYPES) {
-            return 'application/ld+json';
-        }
-    }
-
-    // Default to HTML if no matches
-    return 'text/html';
-}
-
+/**
+ * Handle GET requests with content negotiation
+ * Serves different content types based on the Accept header
+ */
 export const GET: RequestHandler = async ({ request, fetch }) => {
     const acceptHeader = request.headers.get('Accept') || '';
     const bestType = negotiateContentType(acceptHeader);
-    
-    // Common headers for all responses
-    const commonHeaders = {
-        'Vary': 'Accept',
-        ...getCorsHeaders() // Add CORS headers to all responses
-    };
     
     // If the negotiated type is not HTML, serve the appropriate RDF format
     const config = CONTENT_TYPES[bestType];
@@ -97,45 +23,21 @@ export const GET: RequestHandler = async ({ request, fetch }) => {
         const response = await fetch(config.path);
         
         if (!response.ok) {
-            return new Response(`${bestType} data not found`, { 
-                status: 404,
-                headers: commonHeaders
-            });
+            return buildNotFoundResponse(`${bestType} data not found`);
         }
         
         const content = await response.text();
-        
-        // Return the content with appropriate headers
-        return new Response(content, {
-            headers: {
-                'Content-Type': `${bestType}; charset=utf-8`,
-                ...commonHeaders
-            }
-        });
+        return buildRdfResponse(content, bestType);
     }
     
     // For HTML requests, let SvelteKit handle the normal page rendering
-    // but include Link headers to help HTML clients discover the alternative representations
-    return new Response(null, {
-        status: 200,
-        headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            ...commonHeaders
-        }
-    });
+    return buildHtmlResponse();
 };
 
-// Add OPTIONS method to inform clients about available content types
+/**
+ * Handle OPTIONS requests
+ * Informs clients about available content types
+ */
 export const OPTIONS: RequestHandler = async () => {
-    const supportedTypes = Object.keys(CONTENT_TYPES).join(', ');
-    
-    return new Response(null, {
-        headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Allow': 'GET, OPTIONS',
-            'Accept': supportedTypes,
-            'Vary': 'Accept',
-            ...getCorsHeaders() // Add CORS headers to OPTIONS response
-        }
-    });
+    return buildOptionsResponse();
 }; 
