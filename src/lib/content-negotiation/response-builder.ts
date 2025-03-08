@@ -13,21 +13,6 @@ const getCommonHeaders = () => ({
 });
 
 /**
- * Build a response for RDF content
- * @param content - The content to include in the response
- * @param contentType - The content type of the response
- * @returns A Response object with appropriate headers
- */
-export function buildRdfResponse(content: string, contentType: string): Response {
-    return new Response(content, {
-        headers: {
-            'Content-Type': `${contentType}; charset=utf-8`,
-            ...getCommonHeaders()
-        }
-    });
-}
-
-/**
  * Build a response for HTML content
  * @returns A Response object with appropriate headers
  */

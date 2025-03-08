@@ -4,7 +4,8 @@ import {
     isRdfConfig,
     negotiateContentType,
     buildHtmlResponse,
-    buildOptionsResponse
+    buildOptionsResponse,
+    getCorsHeaders
 } from '$lib/content-negotiation';
 
 /**
@@ -28,7 +29,8 @@ export const GET: RequestHandler = async ({ request, url }) => {
             status: 302, // Temporary redirect
             headers: {
                 'Location': config.path,
-                'Cache-Control': 'no-store'
+                'Cache-Control': 'no-store',
+                ...getCorsHeaders() // Add CORS headers to the redirect
             }
         });
     }
