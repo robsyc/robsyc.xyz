@@ -35,11 +35,7 @@ function isRdfConfig(config: ContentTypeConfig): config is RdfContentTypeConfig 
 // Generate common CORS headers for all responses
 function getCorsHeaders(): Record<string, string> {
     return {
-        'Access-Control-Allow-Origin': '*', // Allow requests from any origin
-        'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS methods
-        'Access-Control-Allow-Headers': 'Accept, Content-Type', // Allow these headers in requests
-        'Access-Control-Expose-Headers': 'Link, Content-Type, Vary', // Expose these headers to clients
-        'Access-Control-Max-Age': '86400' // Cache preflight requests for 24 hours
+        'Access-Control-Allow-Origin': '*' // Allow requests from any origin
     };
 }
 
@@ -85,18 +81,6 @@ function negotiateContentType(acceptHeader: string): string {
     return 'text/html';
 }
 
-// Generate Link headers for content type alternatives
-function generateLinkHeaders(excludeType?: string): string {
-    return Object.entries(CONTENT_TYPES)
-        .filter(([type, config]) => isRdfConfig(config) && type !== excludeType)
-        .map(([type, config]) => {
-            // We've already checked that this is an RDF config with the isRdfConfig guard
-            const { path } = config as RdfContentTypeConfig;
-            return `<${path}>; rel="alternate"; type="${type}"`;
-        })
-        .join(', ');
-}
-
 export const GET: RequestHandler = async ({ request, fetch }) => {
     const acceptHeader = request.headers.get('Accept') || '';
     const bestType = negotiateContentType(acceptHeader);
@@ -125,7 +109,6 @@ export const GET: RequestHandler = async ({ request, fetch }) => {
         return new Response(content, {
             headers: {
                 'Content-Type': `${bestType}; charset=utf-8`,
-                'Link': generateLinkHeaders(bestType),
                 ...commonHeaders
             }
         });
@@ -137,7 +120,6 @@ export const GET: RequestHandler = async ({ request, fetch }) => {
         status: 200,
         headers: {
             'Content-Type': 'text/html; charset=utf-8',
-            'Link': generateLinkHeaders(),
             ...commonHeaders
         }
     });
@@ -153,7 +135,6 @@ export const OPTIONS: RequestHandler = async () => {
             'Allow': 'GET, OPTIONS',
             'Accept': supportedTypes,
             'Vary': 'Accept',
-            'Link': generateLinkHeaders(),
             ...getCorsHeaders() // Add CORS headers to OPTIONS response
         }
     });
