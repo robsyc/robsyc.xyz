@@ -50,7 +50,7 @@ export function buildHtmlResponse(): Response {
         headers: {
             'Content-Type': 'text/html; charset=utf-8',
             // HTML content should be revalidated more frequently
-            'Cache-Control': 'public, max-age=600',
+            'Cache-Control': 'public, max-age=600, s-maxage=3600, stale-while-revalidate=600',
             // Vercel and other CDNs - 1 hour
             'CDN-Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600',
             // Vercel Edge Network only - 1 day
@@ -73,7 +73,7 @@ export function buildRdfResponse(contentType: string, content: string): Response
         headers: {
             'Content-Type': `${contentType}; charset=utf-8`,
             // Browser cache - 1 hour
-            'Cache-Control': 'public, max-age=3600',
+            'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=600',
             // Vercel and other CDNs - 1 day
             'CDN-Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=600',
             // Vercel Edge Network only - 1 week
@@ -112,7 +112,7 @@ export function buildOptionsResponse(): Response {
             'Accept': getSupportedContentTypes(),
             'Vary': 'Accept',
             // OPTIONS responses can be cached for a day
-            'Cache-Control': 'public, max-age=86400',
+            'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=600',
             // Vercel and other CDNs - 1 day
             'CDN-Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=600',
             // Vercel Edge Network only - 1 week

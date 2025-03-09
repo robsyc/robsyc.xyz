@@ -11,8 +11,7 @@ import {
 
 /**
  * Handle GET requests with content negotiation
- * Due to Vercel CDN limitations with the Vary header, we redirect to specific URLs
- * instead of serving different content types based on the Accept header.
+ * Using a more robust approach for Vercel CDN compatibility
  */
 export const GET: RequestHandler = async ({ request, url }) => {
     // Only apply content negotiation for the root URL
@@ -33,11 +32,15 @@ export const GET: RequestHandler = async ({ request, url }) => {
     
     if (bestType !== 'text/html' && isRdfConfig(config)) {
         console.log('Redirecting to:', config.path);
+        
+        // Use a 307 redirect with cache-control: no-store to prevent caching the redirect
         return new Response(null, {
-            status: 302, // Temporary redirect
+            status: 307, // Temporary redirect that preserves the request method
             headers: {
                 'Location': config.path,
-                'Cache-Control': 'no-store',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }
