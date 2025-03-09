@@ -18,11 +18,11 @@ export type ContentTypeConfig = RdfContentTypeConfig | HtmlContentTypeConfig;
 // Define supported content types and their file paths
 export const CONTENT_TYPES: Record<string, ContentTypeConfig> = {
     'text/turtle': {
-        path: '/rdf/me.ttl',
+        path: '/api/rdf/turtle',
         extension: 'ttl'
     },
     'application/ld+json': {
-        path: '/rdf/me.jsonld',
+        path: '/api/rdf/jsonld',
         extension: 'jsonld'
     },
     'text/html': {
