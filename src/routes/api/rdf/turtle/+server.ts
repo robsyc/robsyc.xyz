@@ -1,21 +1,25 @@
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import type { RequestHandler } from './$types';
 import { buildRdfResponse, buildNotFoundResponse } from '$lib/content-negotiation';
+import { base } from '$app/paths';
 
 /**
  * Handle GET requests for Turtle data
  */
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ fetch }) => {
     try {
-        // Read the Turtle file from the static directory
-        const filePath = join(process.cwd(), 'static', 'rdf', 'me.ttl');
-        const content = await fs.readFile(filePath, 'utf-8');
+        // Fetch the Turtle file from the static directory using fetch API
+        const response = await fetch(`${base}/rdf/me.ttl`);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch Turtle file: ${response.status} ${response.statusText}`);
+        }
+        
+        const content = await response.text();
         
         // Return the Turtle content with appropriate headers
         return buildRdfResponse('text/turtle', content);
     } catch (error) {
-        console.error('Error reading Turtle file:', error);
+        console.error('Error fetching Turtle file:', error);
         return buildNotFoundResponse('Turtle file not found');
     }
 };
@@ -23,24 +27,29 @@ export const GET: RequestHandler = async () => {
 /**
  * Handle HEAD requests for Turtle data
  */
-export const HEAD: RequestHandler = async () => {
+export const HEAD: RequestHandler = async ({ fetch }) => {
     try {
-        // Read the Turtle file from the static directory
-        const filePath = join(process.cwd(), 'static', 'rdf', 'me.ttl');
-        const content = await fs.readFile(filePath, 'utf-8');
+        // Fetch the Turtle file from the static directory using fetch API
+        const response = await fetch(`${base}/rdf/me.ttl`);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch Turtle file: ${response.status} ${response.statusText}`);
+        }
+        
+        const content = await response.text();
         
         // Return just the headers for the Turtle content
-        const response = buildRdfResponse('text/turtle', content);
+        const rdfResponse = buildRdfResponse('text/turtle', content);
         return new Response(null, {
-            status: response.status,
-            headers: response.headers
+            status: rdfResponse.status,
+            headers: rdfResponse.headers
         });
     } catch (error) {
-        console.error('Error reading Turtle file:', error);
-        const response = buildNotFoundResponse('Turtle file not found');
+        console.error('Error fetching Turtle file:', error);
+        const notFoundResponse = buildNotFoundResponse('Turtle file not found');
         return new Response(null, {
-            status: response.status,
-            headers: response.headers
+            status: notFoundResponse.status,
+            headers: notFoundResponse.headers
         });
     }
 }; 
