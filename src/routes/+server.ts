@@ -41,8 +41,6 @@ export const GET: RequestHandler = async ({ request, url }) => {
                 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
                 'Pragma': 'no-cache',
                 'Expires': '0',
-                'Vary': 'Accept', // Explicitly add Vary header to the redirect
-                'X-Content-Type-Options': 'nosniff', // Prevent content type sniffing
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }
@@ -90,8 +88,6 @@ export const HEAD: RequestHandler = async ({ request, url }) => {
                 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
                 'Pragma': 'no-cache',
                 'Expires': '0',
-                'Vary': 'Accept', // Explicitly add Vary header to the redirect
-                'X-Content-Type-Options': 'nosniff', // Prevent content type sniffing
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }

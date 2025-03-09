@@ -55,7 +55,6 @@ export function buildHtmlResponse(): Response {
             'CDN-Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=600',
             // Vercel Edge Network only - 1 day
             'Vercel-CDN-Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600',
-            'X-Content-Type-Options': 'nosniff', // Prevent content type sniffing
             ...getCommonHeaders(),
             ...getLinkHeaders()
         }
@@ -79,7 +78,6 @@ export function buildRdfResponse(contentType: string, content: string): Response
             'CDN-Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=600',
             // Vercel Edge Network only - 1 week
             'Vercel-CDN-Cache-Control': 'public, s-maxage=604800, stale-while-revalidate=86400',
-            'X-Content-Type-Options': 'nosniff', // Prevent content type sniffing
             ...getCommonHeaders(),
             ...getLinkHeaders()
         }
