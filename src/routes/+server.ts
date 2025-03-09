@@ -37,12 +37,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
             status: 302, // Temporary redirect
             headers: {
                 'Location': config.path,
-                // Redirects can be cached for a short time
-                'Cache-Control': 'public, max-age=60',
-                // Vercel and other CDNs - 5 minutes
-                'CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60',
-                // Vercel Edge Network only - 10 minutes
-                'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300',
+                'Cache-Control': 'no-store',
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }
@@ -87,12 +82,7 @@ export const HEAD: RequestHandler = async ({ request, url }) => {
             status: 302, // Temporary redirect
             headers: {
                 'Location': config.path,
-                // Redirects can be cached for a short time
-                'Cache-Control': 'public, max-age=60',
-                // Vercel and other CDNs - 5 minutes
-                'CDN-Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60',
-                // Vercel Edge Network only - 10 minutes
-                'Vercel-CDN-Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300',
+                'Cache-Control': 'no-store',
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }
