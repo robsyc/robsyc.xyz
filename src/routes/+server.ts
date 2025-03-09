@@ -82,10 +82,12 @@ export const HEAD: RequestHandler = async ({ request, url }) => {
     if (bestType !== 'text/html' && isRdfConfig(config)) {
         console.log('HEAD Redirecting to:', config.path);
         return new Response(null, {
-            status: 302, // Temporary redirect
+            status: 307, // Temporary redirect that preserves the request method
             headers: {
                 'Location': config.path,
-                'Cache-Control': 'no-store',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }
