@@ -38,9 +38,9 @@ export const GET: RequestHandler = async ({ request, url }) => {
             status: 307, // Temporary redirect that preserves the request method
             headers: {
                 'Location': config.path,
-                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
+                // 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                // 'Pragma': 'no-cache',
+                // 'Expires': '0',
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }
@@ -85,9 +85,9 @@ export const HEAD: RequestHandler = async ({ request, url }) => {
             status: 307, // Temporary redirect that preserves the request method
             headers: {
                 'Location': config.path,
-                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0',
+                // 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                // 'Pragma': 'no-cache',
+                // 'Expires': '0',
                 ...getCorsHeaders(), // Add CORS headers to the redirect
                 ...getLinkHeaders()  // Add Link headers for content type discovery
             }
