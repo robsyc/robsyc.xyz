@@ -1,0 +1,109 @@
+{
+    "@context": {
+        "schema": "https://schema.org/",
+        "xsd": "https://www.w3.org/2001/XMLSchema#"
+    },
+    "@graph": [
+        {
+            "@id": "https://www.robsyc.xyz#me",
+            "@type": "schema:Person",
+            "schema:name": {
+                "@value": "robsyc",
+                "@type": "xsd:string"
+            },
+            "schema:image": {
+                "@id": "https://www.robsyc.xyz/assets/img/me.png"
+            },
+            "schema:gender": {
+                "@id": "schema:Male"
+            },
+            "schema:givenName": {
+                "@value": "Robbe",
+                "@type": "xsd:string"
+            },
+            "schema:familyName": {
+                "@value": "Claeys",
+                "@type": "xsd:string"
+            },
+            "schema:birthDate": {
+                "@value": "2000-04-03",
+                "@type": "xsd:date"
+            },
+            "schema:birthPlace": {
+                "@id": "https://www.wikidata.org/wiki/Q1296"
+            },
+            "schema:nationality": {
+                "@id": "https://www.wikidata.org/wiki/Q31"
+            },
+            "schema:affiliation": {
+                "@id": "https://www.wikidata.org/wiki/Q1137665"
+            },
+            "schema:knows": [
+                {
+                    "@id": "https://pietercolpaert.be#me"
+                },
+                {
+                    "@id": "https://sandervandamme.com#me"
+                },
+                {
+                    "@id": "https://www.ebisi.be/stijndeknudt"
+                },
+                {
+                    "@id": "http://lippelo.me/#erwin.geeraerts"
+                },
+                {
+                    "@id": "https://gc-cc.github.io/#me"
+                },
+                {
+                    "@id": "https://tobiashendrickx.be/about#me"
+                },
+                {
+                    "@id": "https://bavop.github.io/rep/#me"
+                },
+                {
+                    "@id": "https://ginfinai.be/#me"
+                }
+            ]
+        },
+        {
+            "@id": "https://www.wikidata.org/wiki/Q1137665",
+            "@type": "schema:CollegeOrUniversity",
+            "schema:name": [
+                {
+                    "@value": "Ghent University",
+                    "@language": "en"
+                },
+                {
+                    "@value": "Universiteit Gent", 
+                    "@language": "nl"
+                }
+            ],
+            "schema:location": {
+                "@id": "https://www.wikidata.org/wiki/Q1296"
+            }
+        },
+        {
+            "@id": "https://pietercolpaert.be/teaching/kg/",
+            "@type": "schema:Course",
+            "schema:name": {
+                "@value": "Knowledge Graphs"
+            },
+            "schema:provider": {
+                "@id": "https://www.wikidata.org/wiki/Q1137665"
+            },
+            "schema:hasCourseInstance": {
+                "@id": "https://pietercolpaert.be/teaching/kg/#2024-2025"
+            }
+        },
+        {
+            "@id": "https://pietercolpaert.be/teaching/kg/#2024-2025",
+            "@type": "schema:CourseInstance",
+            "schema:instructor": {
+                "@id": "https://pietercolpaert.be#me"
+            },
+            "schema:attendee": {
+                "@id": "https://www.robsyc.xyz#me"
+            }
+        }
+    ]
+}

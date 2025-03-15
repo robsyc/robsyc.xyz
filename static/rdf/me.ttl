@@ -1,0 +1,37 @@
+@prefix schema: <https://schema.org/>.
+@prefix xsd: <https://www.w3.org/2001/XMLSchema#>.
+# https://lov.linkeddata.es/dataset/lov
+
+<https://www.robsyc.xyz#me> a schema:Person;
+    schema:name "robsyc"^^xsd:string;
+    schema:image <https://www.robsyc.xyz/assets/img/me.png>;
+    schema:gender schema:Male;
+    schema:givenName "Robbe"^^xsd:string;
+    schema:familyName "Claeys"^^xsd:string;
+    schema:birthDate "2000-04-03"^^xsd:date;
+    schema:birthPlace <https://www.wikidata.org/wiki/Q1296>;     # Ghent (city)
+    schema:nationality <https://www.wikidata.org/wiki/Q31>;      # Belgium (country)
+    schema:affiliation <https://www.wikidata.org/wiki/Q1137665>; # Ghent University (CollegeOrUniversity)
+    
+    schema:knows 
+        <https://pietercolpaert.be#me>,
+        <https://sandervandamme.com#me>,
+        <https://www.ebisi.be/stijndeknudt>,
+        <http://lippelo.me/#erwin.geeraerts>,
+        <https://gc-cc.github.io/#me>,
+        <https://tobiashendrickx.be/about#me>,
+        <https://bavop.github.io/rep/#me>,
+        <https://ginfinai.be/#me>.
+
+<https://www.wikidata.org/wiki/Q1137665> a schema:CollegeOrUniversity;
+    schema:name "Ghent University"@en, "Universiteit Gent"@nl;
+    schema:location <https://www.wikidata.org/wiki/Q1296>.
+
+<https://pietercolpaert.be/teaching/kg/> a schema:Course;
+    schema:name "Knowledge Graphs";
+    schema:provider <https://www.wikidata.org/wiki/Q1137665>;
+    schema:hasCourseInstance <https://pietercolpaert.be/teaching/kg/#2024-2025>.
+
+<https://pietercolpaert.be/teaching/kg/#2024-2025> a schema:CourseInstance;
+    schema:instructor <https://pietercolpaert.be#me>;
+    schema:attendee <https://www.robsyc.xyz#me>.
