@@ -129,20 +129,3 @@ export function buildOptionsResponse(url: URL): Response {
     
     return response;
 }
-
-/**
- * Generate an ETag for a content string
- * @param content The content to generate an ETag for
- * @returns An ETag string
- */
-export function generateETag(content: string): string {
-    // Simple hash function for demonstration
-    // In production, you might want to use a more robust hashing algorithm
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-        const char = content.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return `"${hash.toString(16)}"`;
-}

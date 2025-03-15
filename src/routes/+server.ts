@@ -6,7 +6,6 @@ import {
     buildOptionsResponse, 
     CONTENT_TYPES,
     generateLinkHeaders,
-    generateETag
 } from '$lib/negotiation';
 
 /**
@@ -32,7 +31,6 @@ export const GET: RequestHandler = async ({ request, url, fetch }) => {
             headers: {
                 'Content-Type': 'text/html',
                 'Vary': 'Accept',
-                'Cache-Control': 'max-age=3600, public' // Cache for 1 hour
             }
         });
         return addCorsHeaders(response);
@@ -53,24 +51,6 @@ export const GET: RequestHandler = async ({ request, url, fetch }) => {
         // Get the file content
         const fileContent = await fileResponse.text();
         
-        // Generate ETag for the content
-        const etag = generateETag(fileContent);
-        
-        // Check if the client has a cached version (If-None-Match header)
-        const ifNoneMatch = request.headers.get('If-None-Match');
-        if (ifNoneMatch === etag) {
-            // Client has the current version, return 304 Not Modified
-            const notModifiedResponse = new Response(null, {
-                status: 304,
-                headers: {
-                    'ETag': etag,
-                    'Vary': 'Accept',
-                    'Cache-Control': 'max-age=3600, public', // Cache for 1 hour
-                }
-            });
-            return addCorsHeaders(notModifiedResponse);
-        }
-        
         // Generate Link headers for alternative formats
         const linkHeader = generateLinkHeaders(contentType, baseUrl);
         
@@ -79,9 +59,7 @@ export const GET: RequestHandler = async ({ request, url, fetch }) => {
             headers: {
                 'Content-Type': contentType,
                 'Vary': 'Accept',
-                'Cache-Control': 'max-age=3600, public', // Cache for 1 hour
                 'Content-Length': fileContent.length.toString(),
-                'ETag': etag,
                 'Link': linkHeader
             }
         });
@@ -116,7 +94,6 @@ export const HEAD: RequestHandler = async ({ request, url, fetch }) => {
             headers: {
                 'Content-Type': 'text/html',
                 'Vary': 'Accept',
-                'Cache-Control': 'max-age=3600, public' // Cache for 1 hour
             }
         });
         return addCorsHeaders(response);
@@ -137,7 +114,6 @@ export const HEAD: RequestHandler = async ({ request, url, fetch }) => {
         
         // Get the file content to determine its length and generate ETag
         const fileContent = await fileResponse.text();
-        const etag = generateETag(fileContent);
         
         // Generate Link headers for alternative formats
         const linkHeader = generateLinkHeaders(contentType, baseUrl);
@@ -147,9 +123,7 @@ export const HEAD: RequestHandler = async ({ request, url, fetch }) => {
             headers: {
                 'Content-Type': contentType,
                 'Vary': 'Accept',
-                'Cache-Control': 'max-age=3600, public', // Cache for 1 hour
                 'Content-Length': fileContent.length.toString(),
-                'ETag': etag,
                 'Link': linkHeader
             }
         });
