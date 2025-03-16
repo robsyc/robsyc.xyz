@@ -1,7 +1,7 @@
 # This RDF document describes two photos from the web in Turtle syntax.
 # However, we only use predicates & classes from our own ontology.
 
-@prefix robsyc: <https://www.robsyc.xyz/rdf/ontology-robsyc.ttl#>
+@prefix robsyc: <https://www.robsyc.xyz/rdf/ontology-robsyc.ttl#>.
 
 <https://www.robsyc.xyz/assets/me.jpeg> a robsyc:Photo;
     robsyc:hasTitle "Me"@en;
