@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { CONTENT_TYPES } from './negotiation';
-import { addAllHeaders, addCorsHeaders, addStandardHeaders, generateLinkHeaders } from './addHeaders';
+import { addAllHeaders, generateLinkHeaders } from './addHeaders';
 
 /**
  * Build a response for HTML content
