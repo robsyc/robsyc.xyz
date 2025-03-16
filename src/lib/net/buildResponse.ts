@@ -10,13 +10,8 @@ import { addAllHeaders, addCorsHeaders, addStandardHeaders, generateLinkHeaders 
 export function buildHtmlResponse(baseUrl: string): Response {
     const response = new Response(null, {
         status: 200,
-        headers: {
-            'Content-Type': 'text/html',
-            'Vary': 'Accept',
-            'Link': generateLinkHeaders('', baseUrl),
-        }
     });
-    return addCorsHeaders(response);
+    return addAllHeaders(response, 'text/html', baseUrl);
 }
 
 /**
