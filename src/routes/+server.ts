@@ -105,14 +105,13 @@ export const HEAD: RequestHandler = async ({ request, url, fetch }) => {
     
     try {
         // Fetch the file from the static directory using SvelteKit's fetch
-        // We need to do this to get the content length and generate ETag
         const fileResponse = await fetch(filePath);
         
         if (!fileResponse.ok) {
             throw error(404, 'Resource not found');
         }
         
-        // Get the file content to determine its length and generate ETag
+        // Get the file content to determine its length
         const fileContent = await fileResponse.text();
         
         // Generate Link headers for alternative formats
