@@ -55,7 +55,7 @@ export function negotiateContentType(acceptHeader: string): string {
  * @param acceptHeader The Accept header from the request
  * @returns An array of accepted types sorted by quality
  */
-function parseAcceptHeader(acceptHeader: string): Array<{ mimeType: string, quality: number }> {
+export function parseAcceptHeader(acceptHeader: string): Array<{ mimeType: string, quality: number }> {
     return acceptHeader
         .split(',')
         .map(part => {
@@ -74,58 +74,4 @@ function parseAcceptHeader(acceptHeader: string): Array<{ mimeType: string, qual
             return { mimeType: mimeType.trim(), quality };
         })
         .sort((a, b) => b.quality - a.quality); // Sort by quality (highest first)
-}
-
-/**
- * Generate Link headers for content alternatives
- * @param currentType The current content type being served
- * @param baseUrl The base URL of the request
- * @returns A string containing the Link header value
- */
-export function generateLinkHeaders(currentType: string, baseUrl: string): string {
-    return Object.entries(CONTENT_TYPES)
-        .filter(([type]) => type !== currentType) // Don't include the current type
-        .map(([type, info]) => {
-            return `<${baseUrl}${info.path}>; rel="${info.rel}"; type="${type}"`;
-        })
-        .join(', ');
-}
-
-/**
- * Add CORS headers to a response
- * @param response The response to add headers to
- * @returns The response with CORS headers
- */
-export function addCorsHeaders(response: Response): Response {
-    response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Accept');
-    response.headers.set('Access-Control-Max-Age', '86400'); // 24 hours
-    return response;
-}
-
-/**
- * Build a response for OPTIONS requests
- * @param url The URL of the request
- * @returns A response with appropriate headers for OPTIONS requests
- */
-export function buildOptionsResponse(url: URL): Response {
-    const baseUrl = `${url.protocol}//${url.host}`;
-    const linkHeader = generateLinkHeaders('', baseUrl);
-    
-    const response = new Response(null, {
-        status: 204, // No Content
-        headers: {
-            'Allow': 'GET, HEAD, OPTIONS',
-            'Vary': 'Accept',
-            'Link': linkHeader,
-            'Cache-Control': 'max-age=86400, public', // Cache OPTIONS responses for 24 hours
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Accept',
-            'Access-Control-Max-Age': '86400' // 24 hours
-        }
-    });
-    
-    return response;
 }

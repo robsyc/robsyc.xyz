@@ -8,10 +8,10 @@
     } from '@xyflow/svelte';
     
     // Import our flow data
-    import { initialNodes, initialEdges } from '$lib/flow-data';
+    import { initialNodes, initialEdges } from '$lib/flow/flow-data';
     
     // Import our theme utility
-    import { flowColorMode } from '$lib/theme';
+    import { flowColorMode } from '$lib/utils';
    
     // Using $state.raw for the nodes and edges so Svelte Flow can update their positions
     let nodes = $state.raw(initialNodes);
