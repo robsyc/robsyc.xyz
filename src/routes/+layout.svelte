@@ -3,8 +3,7 @@
 	// 👇 this is important! You need to import the styles for Svelte Flow to work
 	import '@xyflow/svelte/dist/style.css';
 
-	import { ModeWatcher } from "mode-watcher";
-	import { toggleMode } from "mode-watcher";
+	import { ModeWatcher, toggleMode } from "mode-watcher";
 
 	// Fix imports to use the correct path for Svelte components
 	import { Sun, Moon, Sprout } from "lucide-svelte";
@@ -23,7 +22,7 @@
 
 <!-- Full-width header with centered navigation -->
 <header class="fixed top-0 left-0 right-0 w-full z-40 flex justify-center pt-4 lg:pt-6">
-	<nav class="bg-background/90 backdrop-blur-sm border border-border/40 rounded-full shadow-sm min-w-[200px] max-w-[90%] flex items-center overflow-hidden">
+	<nav class="bg-background/90 backdrop-blur-sm border border-border rounded-full shadow-sm flex items-center overflow-hidden">
 		
 		<div class="px-5 py-2">
 			<a href="/" class="font-mono text-xl inline-flex items-center leading-none hover:opacity-80 transition-opacity">robsyc.xyz</a>
@@ -36,9 +35,9 @@
 				<span class="sr-only">Toggle theme</span>
 			</Button>
 
-			<Button variant="outline" size="icon" class="rounded-none rounded-r-full border-y-0 border-l-0 border-r h-full flex items-center justify-center">
+			<!-- <Button variant="outline" size="icon" class="rounded-none rounded-r-full border-y-0 border-l-0 border-r h-full flex items-center justify-center">
 				<Sprout class="h-[1.2rem] w-[1.2rem]" />
-			</Button>
+			</Button> -->
 		</div>
 	</nav>
 </header>
