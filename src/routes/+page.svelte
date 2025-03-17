@@ -10,6 +10,9 @@
     // Import our flow data
     import { initialNodes, initialEdges } from '$lib/flow/flow-data';
     
+    // Import our custom node types
+    import { nodeTypes } from '$lib/flow/components';
+    
     // Import our theme utility
     import { flowColorMode } from '$lib/utils';
    
@@ -29,6 +32,7 @@
     fitView
     colorMode={$flowColorMode}
     onnodeclick={handleNodeClick}
+    {nodeTypes}
 >
     <Controls />
     <Background variant={BackgroundVariant.Dots} />
