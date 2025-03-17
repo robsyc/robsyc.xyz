@@ -6,6 +6,7 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix foaf: <http://xmlns.com/foaf/0.1/>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
 
 robsyc:Photo a rdfs:Class;
     rdfs:subClassOf foaf:Image;
@@ -16,6 +17,12 @@ robsyc:Author a rdfs:Class;
     rdfs:subClassOf foaf:Person;
     rdfs:label "Author"@en;
     rdfs:comment "A person who creates a photo."@en.
+
+robsyc:hasName a rdf:Property;
+    rdfs:subPropertyOf foaf:name;
+    rdfs:label "hasName"@en;
+    rdfs:range xsd:string;
+    rdfs:comment "Name"@en.
 
 robsyc:hasTitle a rdf:Property;
     rdfs:label "hasTitle"@en;
@@ -45,5 +52,5 @@ robsyc:depicts a rdf:Property;
 robsyc:hasCaption a rdf:Property;
     rdfs:label "hasCaption"@en;
     rdfs:domain robsyc:Photo;
-    rdfs:range robsyc:Caption;
+    rdfs:range xsd:string;
     rdfs:comment "Caption of the photo."@en.
