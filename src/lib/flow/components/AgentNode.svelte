@@ -61,7 +61,7 @@
         </div>
 
         <div class="flex gap-2 items-center">
-            <ScrollArea class="h-[70px] w-[240px] rounded-[0.2rem] border p-1 pl-2 pr-3 nodrag nowheel">
+            <ScrollArea class="h-[72px] w-[240px] rounded-[0.2rem] border p-1 pl-2 pr-3 nodrag nowheel">
                 <div class="text-left">
                     {#if $typedText.length > 0}
                         <p class="whitespace-pre-line">{$typedText[$currentLineIndex]}</p>
