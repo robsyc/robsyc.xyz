@@ -24,7 +24,7 @@
 <header class="fixed top-0 left-0 right-0 w-full z-40 flex justify-center pt-4 lg:pt-6">
 	<nav class="bg-background/90 border border-border rounded-full shadow-sm flex items-center overflow-hidden">
 		
-		<div class="px-5 py-2">
+		<div class="px-4 py-2">
 			<a href="/" class="font-mono text-xl inline-flex items-center leading-none hover:opacity-80 transition-opacity">robsyc.xyz</a>
 		</div>
 		

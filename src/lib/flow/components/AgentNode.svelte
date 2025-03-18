@@ -76,7 +76,7 @@
 
         <div class="flex gap-2 items-center">
             <ScrollArea class="h-[72px] w-[240px] rounded-[0.2rem] border p-1 pl-2 pr-3 nodrag nowheel">
-                <div class="text-left">
+                <div class="text-left font-mono">
                     {#if $typedText.length > 0}
                         <p class="whitespace-pre-line">{$typedText[$currentLineIndex]}</p>
                     {:else}
@@ -98,19 +98,18 @@
                                 </Dialog.Trigger>
                                 <Dialog.Content class="">
                                     <Dialog.Header>
-                                        <Dialog.Title>Interact with Agent</Dialog.Title>
+                                        <Dialog.Title>Interact with <span class="font-mono">{data.name}</span></Dialog.Title>
                                         <Dialog.Description>
                                             Down the line, this dialog will allow you to interact with the agent.
-                                            Chat, or ask it to perform actions.
                                         </Dialog.Description>
                                     </Dialog.Header>
-                                    <div class="py-4">
+                                    <div class="py-3">
                                         <Textarea placeholder="Type your message here." class="w-full" />
                                     </div>
                                     <Dialog.Footer>
                                         <div class="flex gap-3 w-full">
-                                            <Button variant="default" class="flex-1">Message</Button>
-                                            <Button variant="secondary" class="flex-1">Action</Button>
+                                            <Button disabled variant="default" class="flex-1">Message</Button>
+                                            <Button disabled variant="secondary" class="flex-1">Action</Button>
                                         </div>
                                     </Dialog.Footer>
                                 </Dialog.Content>
