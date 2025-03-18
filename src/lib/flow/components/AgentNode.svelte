@@ -5,7 +5,7 @@
 
   import * as Avatar from "$lib/components/ui/avatar/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
-  import * as Popover from "$lib/components/ui/popover/index.js";
+  import * as Dialog from "$lib/components/ui/dialog/index.js";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
@@ -38,6 +38,20 @@
         startTyping();
       }, 2500);
     }
+    
+    // Add keyboard event listener for Enter key
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        handleChevronClick();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeydown);
+    
+    // Clean up the event listener when component is destroyed
+    return () => {
+      window.removeEventListener('keydown', handleKeydown);
+    };
   });
   
   // Handle chevron click to progress to the next message
@@ -76,20 +90,31 @@
                 <Tooltip.Provider delayDuration={100} disableHoverableContent={true}>
                     <Tooltip.Root>
                         <Tooltip.Trigger>
-                            <Popover.Root>
-                                <Popover.Trigger>
-                                    <Button variant="ghost" size="icon" class="w-8 h-8">
+                            <Dialog.Root>
+                                <Dialog.Trigger>
+                                    <Button variant="ghost" size="icon" class="w-8 h-8 nodrag">
                                         <BotMessageSquare />
                                     </Button>
-                                </Popover.Trigger>
-                                <Popover.Content class="w-[440px] p-4 space-y-3">
-                                    <p class="text-sm text-muted-foreground">
-                                        Down the line, this popover will contain an input field for the user to respond to the agent.
-                                        As well as some default actions.
-                                    </p>
-                                    <Textarea placeholder="Type your message here." class="min-h-[100px]" />
-                                </Popover.Content>
-                            </Popover.Root>
+                                </Dialog.Trigger>
+                                <Dialog.Content class="">
+                                    <Dialog.Header>
+                                        <Dialog.Title>Interact with Agent</Dialog.Title>
+                                        <Dialog.Description>
+                                            Down the line, this dialog will allow you to interact with the agent.
+                                            Chat, or ask it to perform actions.
+                                        </Dialog.Description>
+                                    </Dialog.Header>
+                                    <div class="py-4">
+                                        <Textarea placeholder="Type your message here." class="w-full" />
+                                    </div>
+                                    <Dialog.Footer>
+                                        <div class="flex gap-3 w-full">
+                                            <Button variant="default" class="flex-1">Message</Button>
+                                            <Button variant="secondary" class="flex-1">Action</Button>
+                                        </div>
+                                    </Dialog.Footer>
+                                </Dialog.Content>
+                            </Dialog.Root>
                         </Tooltip.Trigger>
                         <Tooltip.Content>
                             <p class="text-xs">Interact</p>
@@ -100,7 +125,7 @@
                 <Tooltip.Provider delayDuration={100} disableHoverableContent={true}>
                     <Tooltip.Root>
                         <Tooltip.Trigger>
-                            <Button onclick={handleChevronClick} variant="ghost" size="icon" class="w-8 h-8">
+                            <Button onclick={handleChevronClick} variant="ghost" size="icon" class="w-8 h-8 nodrag">
                                 <ChevronDown class="{$isTyping ? '' : ($currentLineIndex < messages.length - 1 ? 'animate-bounce' : '')}" />
                             </Button>
                         </Tooltip.Trigger>
@@ -113,7 +138,7 @@
         </div>
     </div>
   
-  <Handle type="source" position={Position.Right} />
+  <Handle type="source" position={Position.Bottom} />
 </div>
 
 <style>

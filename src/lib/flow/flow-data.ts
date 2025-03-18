@@ -16,19 +16,19 @@ export const initialNodes: CustomNode[] = [
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
       ]
     },
-    position: { x: -200, y: 0 }
+    position: { x: -150, y: 0 }
   },
   {
     id: '1',
     type: 'input',
     data: { label: 'Hello' },
-    position: { x: 250, y: 0 }
+    position: { x: -100, y: 200 }
   },
   {
     id: '2',
     type: 'default',
     data: { label: 'World!' },
-    position: { x: 200, y: 150 }
+    position: { x: 60, y: 300 }
   },
   // {
   //   id: '3',
@@ -48,7 +48,7 @@ export const initialEdges: Edge[] = [
     type: 'default',
     source: '1',
     target: '2',
-    label: 'EDGE',
+    label: 'EDGE!',
     animated: true
   },
   // {
