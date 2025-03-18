@@ -11,7 +11,7 @@ export interface AgentNodeData extends Record<string, unknown> {
   name: string;
   initials: string;
   avatarSrc?: string;
-  message: string;
+  message: string | string[];
 }
 
 // Extended node type with our custom node types
