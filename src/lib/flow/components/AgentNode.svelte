@@ -4,7 +4,7 @@
   import { Handle, Position } from '@xyflow/svelte';
 
   import * as Avatar from "$lib/components/ui/avatar/index.js";
-  import { Button } from "$lib/components/ui/button/index.js";
+  import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
@@ -36,7 +36,7 @@
       // Add a 1 second delay before starting the typewriter effect
       setTimeout(() => {
         startTyping();
-      }, 2500);
+      }, 2000);
     }
     
     // Add keyboard event listener for Enter key
@@ -60,6 +60,9 @@
       typeNextMessage();
     }
   }
+
+  // Svelte Flow passes many props we don't use - this prevents warnings
+  $$restProps;
 </script>
 
 <div 
@@ -75,8 +78,8 @@
         </div>
 
         <div class="flex gap-2 items-center">
-            <ScrollArea class="h-[72px] w-[240px] rounded-[0.2rem] border p-1 pl-2 pr-3 nodrag nowheel">
-                <div class="text-left font-mono">
+            <ScrollArea class="h-[71px] w-[240px] rounded-[0.2rem] border pl-2 pr-3 nowheel nodrag">
+                <div class="text-left font-mono select-text cursor-text my-1">
                     {#if $typedText.length > 0}
                         <p class="whitespace-pre-line">{$typedText[$currentLineIndex]}</p>
                     {:else}
@@ -87,16 +90,19 @@
                 </div>
             </ScrollArea>
             <div class="flex flex-col gap-2">
+                <!-- Interact with agent -->
                 <Tooltip.Provider delayDuration={100} disableHoverableContent={true}>
                     <Tooltip.Root>
                         <Tooltip.Trigger>
                             <Dialog.Root>
                                 <Dialog.Trigger>
-                                    <Button variant="ghost" size="icon" class="w-8 h-8 nodrag">
-                                        <BotMessageSquare />
-                                    </Button>
+                                    {#snippet child({ props })}
+                                        <div {...props} class={`${buttonVariants({ variant: "ghost", size: "icon" })} w-8 h-8 nodrag flex items-center justify-center`}>
+                                            <BotMessageSquare />
+                                        </div>
+                                    {/snippet}
                                 </Dialog.Trigger>
-                                <Dialog.Content class="">
+                                <Dialog.Content>
                                     <Dialog.Header>
                                         <Dialog.Title>Interact with <span class="font-mono">{data.name}</span></Dialog.Title>
                                         <Dialog.Description>
@@ -120,13 +126,20 @@
                         </Tooltip.Content>
                     </Tooltip.Root>
                 </Tooltip.Provider>
-                
+
+                <!-- Continue to next message -->
                 <Tooltip.Provider delayDuration={100} disableHoverableContent={true}>
                     <Tooltip.Root>
                         <Tooltip.Trigger>
-                            <Button onclick={handleChevronClick} variant="ghost" size="icon" class="w-8 h-8 nodrag">
+                            <div 
+                                class={`${buttonVariants({ variant: "ghost", size: "icon" })} w-8 h-8 nodrag flex items-center justify-center`}
+                                on:click={handleChevronClick}
+                                on:keydown={(e) => e.key === 'Enter' && !e.shiftKey && handleChevronClick()}
+                                tabindex="0"
+                                role="button"
+                            >
                                 <ChevronDown class="{$isTyping ? '' : ($currentLineIndex < messages.length - 1 ? 'animate-bounce' : '')}" />
-                            </Button>
+                            </div>
                         </Tooltip.Trigger>
                         <Tooltip.Content>
                             <p class="text-xs">Continue</p>
