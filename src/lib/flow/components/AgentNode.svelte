@@ -66,7 +66,7 @@
 </script>
 
 <div 
-    class="svelte-flow__node-default {selected ? 'selected' : ''} {selectable ? 'selectable' : ''}" 
+    class="svelte-flow__node-default nodrag {selected ? 'selected' : ''} {selectable ? 'selectable' : ''}" 
     style="min-width: 320px; width: auto;">
     <div class="flex space-x-6">
         <div class="flex flex-col items-center justify-center shrink-0 gap-2 pl-2">
@@ -78,7 +78,7 @@
         </div>
 
         <div class="flex gap-2 items-center">
-            <ScrollArea class="h-[71px] w-[240px] rounded-[0.2rem] border pl-2 pr-3 nowheel nodrag">
+            <ScrollArea class="h-[71px] w-[240px] rounded-[0.2rem] border pl-2 pr-3 nowheel">
                 <div class="text-left font-mono select-text cursor-text my-1">
                     {#if $typedText.length > 0}
                         <p class="whitespace-pre-line">{$typedText[$currentLineIndex]}</p>

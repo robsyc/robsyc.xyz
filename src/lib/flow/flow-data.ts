@@ -13,7 +13,8 @@ export const initialNodes: CustomNode[] = [
       message: [
         "Hello! I am robsyc's agent :)\nWelcome to my site!",
         "Would you like to be shown around?",
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+        "Unfortunatly, this site is still under construction. Please check back soon!"
       ]
     },
     position: { x: -150, y: 0 }
