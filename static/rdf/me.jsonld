@@ -1,7 +1,8 @@
 {
     "@context": {
         "schema": "https://schema.org/",
-        "xsd": "https://www.w3.org/2001/XMLSchema#"
+        "xsd": "https://www.w3.org/2001/XMLSchema#",
+        "solid": "http://www.w3.org/ns/solid/terms#"
     },
     "@graph": [
         {
@@ -9,6 +10,10 @@
             "@type": "schema:Person",
             "schema:name": {
                 "@value": "robsyc",
+                "@type": "xsd:string"
+            },
+            "solid:oidcIssuerRegistrationToken": {
+                "@value": "bee90fd0-e54c-4ad6-9ef9-dbde4593268c",
                 "@type": "xsd:string"
             },
             "schema:image": {
