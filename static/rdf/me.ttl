@@ -2,6 +2,8 @@
 @prefix xsd: <https://www.w3.org/2001/XMLSchema#>.
 # https://lov.linkeddata.es/dataset/lov
 
+<https://www.robsyc.xyz#me> <http://www.w3.org/ns/solid/terms#oidcIssuerRegistrationToken> "bee90fd0-e54c-4ad6-9ef9-dbde4593268c".
+
 <https://www.robsyc.xyz#me> a schema:Person;
     schema:name "robsyc"^^xsd:string;
     schema:image <https://www.robsyc.xyz/assets/img/me.png>;
