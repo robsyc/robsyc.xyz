@@ -1,21 +1,47 @@
 <script lang="ts">
-    import type { PageProps } from './$types';
-    import { SvelteFlow, Background } from '@xyflow/svelte';
-
-    let { data }: PageProps = $props();
-
-    let nodes = $state.raw([
-        { id: '1', position: { x: 0, y: 0 }, data: { label: 'Hello' } },
-        { id: '2', position: { x: 0, y: 100 }, data: { label: 'World' } },
-    ]);
-
-    let edges = $state.raw([
-        { id: 'e1-2', source: '1', target: '2' },
-    ]);
+    import { mode } from 'mode-watcher';
+    import {
+        SvelteFlow,
+        Controls,
+        Background,
+        BackgroundVariant,
+        MiniMap
+    } from '@xyflow/svelte';
+    
+    // Import our flow data
+    import { initialNodes, initialEdges } from '$lib/flow/flow-data';
+    
+    // Import our custom node types
+    import { nodeTypes } from '$lib/flow/components';
+   
+    // Using $state.raw for the nodes and edges so Svelte Flow can update their positions
+    let nodes = $state.raw(initialNodes);
+    let edges = $state.raw(initialEdges);
+    
+    // Derive SvelteFlow color mode from mode-watcher (Svelte 5 runes)
+    const colorMode = $derived.by(() => {
+        const m = mode.current;
+        if (m === 'dark') return 'dark';
+        if (m === 'light') return 'light';
+        return 'system';
+    });
+    
+    // Event handlers
+    function handleNodeClick(event: any) {
+        console.log('Node clicked:', event.node);
+    }
 </script>
 
-<div style:width="100vw" style:height="100vh">
-    <SvelteFlow bind:nodes bind:edges>
-        <Background />
-    </SvelteFlow>
-</div>
+<SvelteFlow
+    bind:nodes
+    bind:edges
+    fitView
+    colorMode={colorMode}
+    onnodeclick={handleNodeClick}
+    {nodeTypes}
+    proOptions={{ hideAttribution: true }}
+>
+    <Controls />
+    <Background variant={BackgroundVariant.Dots} />
+    <MiniMap />
+</SvelteFlow>

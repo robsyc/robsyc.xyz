@@ -2,6 +2,8 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 
+	import { ModeWatcher } from "mode-watcher";
+
 	let { children } = $props();
 
 	const meta = {
@@ -20,6 +22,8 @@
 	};
 </script>
 
+<ModeWatcher />
+
 <svelte:head>
 	<title>{meta.title}</title>
 	<meta name="description" content={meta.description} />
@@ -27,6 +31,12 @@
 	<script type="application/ld+json">
 		{@html JSON.stringify(schema)}
 	</script>
+
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+	<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 </svelte:head>
 
-{@render children?.()}
+<main class="h-screen">
+	{@render children?.()}
+</main>
