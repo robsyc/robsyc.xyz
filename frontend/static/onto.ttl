@@ -1,0 +1,11 @@
+@prefix schema: <https://schema.org/> .
+
+<https://robsyc.xyz/#me> a schema:Person;
+  schema:name "Robbe Claeys";
+  schema:alternateName "robsyc";
+  schema:url <https://robsyc.xyz>;
+  schema:birthPlace [
+    a schema:Place;
+    schema:name "Ghent, Belgium"
+  ];
+  schema:knowsAbout "Linked Data", "neuro-symbolic AI", "bouldering" .

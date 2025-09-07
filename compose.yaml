@@ -1,0 +1,52 @@
+services:
+  tentris:
+    image: ghcr.io/tentris/tentris:latest
+    ports:
+      - 9080:9080
+    volumes:
+      - ./db/tentris/data:/data # persistent data storage
+      - ./db/tentris/license.toml:/config/tentris-license.toml:ro  # license file (read-only)
+      # - ./tentris/config.toml:/config/tentris-server-config.toml:ro  # optional config https://docs.tentris.io/configuration_file.html
+    networks:
+      - app-network
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.16
+    ports:
+      - 7700:7700
+    volumes:
+      - ./db/meilisearch/data:/data
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    environment:
+      - TENTRIS_URL=http://tentris:9080
+      - MEILISEARCH_URL=http://meilisearch:7700
+    depends_on:
+      - tentris
+      - meilisearch
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

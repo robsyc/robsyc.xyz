@@ -1,0 +1,12 @@
+{
+	"@context": "https://schema.org",
+	"@type": "Person",
+	"name": "Robbe Claeys",
+	"alternateName": "robsyc",
+	"url": "https://robsyc.xyz",
+	"birthPlace": {
+		"@type": "Place",
+		"name": "Ghent, Belgium"
+	},
+	"knowsAbout": ["Linked Data", "neuro-symbolic AI", "bouldering"]
+}
