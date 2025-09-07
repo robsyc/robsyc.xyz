@@ -11,8 +11,14 @@ services:
 
   frontend:
     volumes:
-      - ./frontend:/app
-      - /app/node_modules  # Exclude node_modules
+      - ./frontend/src:/app/src
+      - ./frontend/static:/app/static
+      - ./frontend/package.json:/app/package.json
+      - ./frontend/bun.lock:/app/bun.lock
+      - ./frontend/svelte.config.js:/app/svelte.config.js
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/components.json:/app/components.json
     environment:
       - ENV=development
     command: ["bun", "run", "dev", "--host", "0.0.0.0", "--port", "3000"]
