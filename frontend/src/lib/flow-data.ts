@@ -1,5 +1,4 @@
 import type { Node, Edge } from '@xyflow/svelte';
-// import type { CustomNode } from './types';
 
 // Define the initial nodes
 export const initialNodes: Node[] = [
@@ -15,6 +14,16 @@ export const initialNodes: Node[] = [
     data: { label: 'World!' },
     position: { x: 60, y: 300 }
   },
+  {
+    id: '3',
+    type: 'card',
+    data: {
+      title: 'Custom node',
+      description: 'Use custom node types to present richer flow content.',
+      content: 'Custom node content'
+    },
+    position: { x: 240, y: 200 }
+  }
 ];
 
 // Define the initial edges
@@ -27,4 +36,11 @@ export const initialEdges: Edge[] = [
     label: 'EDGE!',
     animated: true
   },
+  {
+    id: '1-card-1',
+    type: 'default',
+    source: '1',
+    target: 'card-1',
+    label: 'custom card'
+  }
 ];

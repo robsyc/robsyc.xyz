@@ -9,10 +9,13 @@
     } from '@xyflow/svelte';
     
     // Import our flow data
-    import { initialNodes, initialEdges } from '$lib/flow/flow-data';
+    import { initialNodes, initialEdges } from '$lib/flow-data';
     
     // Import our custom node types
-    import { nodeTypes } from '$lib/flow/components';
+    import CardNode from '$lib/components/flow/CardNode.svelte';
+    const nodeTypes = {
+        card: CardNode,
+    };
    
     // Using $state.raw for the nodes and edges so Svelte Flow can update their positions
     let nodes = $state.raw(initialNodes);
@@ -37,11 +40,11 @@
     bind:edges
     fitView
     colorMode={colorMode}
-    onnodeclick={handleNodeClick}
     {nodeTypes}
+    onnodeclick={handleNodeClick}
     proOptions={{ hideAttribution: true }}
 >
     <Controls />
     <Background variant={BackgroundVariant.Dots} />
-    <MiniMap />
+    <!-- <MiniMap /> -->
 </SvelteFlow>
