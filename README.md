@@ -12,7 +12,7 @@ My personal website!
 ### TODO
 
 - [ ] Create basic view with Linked Data blog (schema.org, foaf, dc, sioc)
-- [ ] Proper ontology A/T/LBox in tandem with data and UI construction (RDFa)
+- [ ] Proper ontology/KG in tandem with data and UI construction (RDFa)
 - [ ] FastAPI to SvelteKit API gateway and database integration
 - [ ] SPARQL and semantic search endpoints
 - [ ] Auth and user functionality (e.g. comments or likes)

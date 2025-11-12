@@ -12,9 +12,9 @@
     import { initialNodes, initialEdges } from '$lib/flow-data';
     
     // Import our custom node types
-    import CardNode from '$lib/components/flow/CardNode.svelte';
+    import BlogNode from '$lib/components/flow/BlogNode.svelte';
     const nodeTypes = {
-        card: CardNode,
+        blog: BlogNode,
     };
    
     // Using $state.raw for the nodes and edges so Svelte Flow can update their positions
