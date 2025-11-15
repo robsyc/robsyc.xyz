@@ -11,7 +11,7 @@ My personal website!
 
 ### TODO
 
-- [ ] Create basic view with Linked Data blog (schema.org, foaf, dc, sioc)
+- [ ] Create basic view with Linked Data blog (schema.org, foaf, dc, sioc, skos)
 - [ ] Proper ontology/KG in tandem with data and UI construction (RDFa)
 - [ ] FastAPI to SvelteKit API gateway and database integration
 - [ ] SPARQL and semantic search endpoints
@@ -26,7 +26,7 @@ My personal website!
 
 ```bash
 # Development mode with hot reloading
-docker compose -f compose.yaml -f compose.dev.yaml up
+docker compose -f compose.yaml -f compose.dev.yaml up --build
 
 # Production mode
 docker compose up -d
@@ -43,7 +43,7 @@ docker-compose up tentris meilisearch
 - **Frontend** (SvelteKit): `http://localhost:3000`
 
 ```bash
-# random commands
+# some useful commands
 curl -H "accept:text/turtle" http://localhost:3000 -L
 curl -H "accept:application/ld+json" http://localhost:3000 -L
 ```
