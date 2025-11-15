@@ -62,12 +62,18 @@ app.add_middleware(
 )
 
 # Include routers
-from api.routers import sparql_router
+from api.routers import sparql_router, blog_router
 
 app.include_router(
     sparql_router, 
     prefix=settings.API_PREFIX + "", 
     tags=["sparql"]
+)
+
+app.include_router(
+    blog_router,
+    prefix=settings.API_PREFIX + "/blog",
+    tags=["blog"]
 )
 
 # Basic endpoints

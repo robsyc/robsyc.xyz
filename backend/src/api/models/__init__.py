@@ -1,8 +1,12 @@
 from .sparql import (
     SparqlQuery,
-    SparqlMediaType,
+    SparqlMediaType
 )
+from .blog import BlogPost
+
 __all__ = [
     "SparqlQuery",
     "SparqlMediaType",
+
+    "BlogPost",
 ]

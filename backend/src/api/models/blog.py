@@ -52,3 +52,61 @@ class BlogPost(BaseRdfModel):
     
     articleBody: Annotated[
         str, WithPredicate(SDO.articleBody)]
+    
+    @classmethod
+    def construct_query(
+        cls,
+        blog_uri: Optional[str] = None,
+        limit: Optional[int] = None,
+    ) -> str:
+        """
+        Generate a SPARQL CONSTRUCT query to retrieve blog posts.
+        
+        Args:
+            blog_uri: Optional URI of a specific blog post to retrieve. If None, retrieves all blog posts.
+            limit: Optional limit on the number of results.
+        
+        Returns:
+            SPARQL CONSTRUCT query string.
+        """
+        construct_patterns = [
+            "?blogPost a schema:BlogPosting",
+            "?blogPost rxyz:x ?x",
+            "?blogPost rxyz:y ?y",
+            "?blogPost schema:author ?author",
+            "?blogPost schema:headline ?headline",
+            "?blogPost schema:datePublished ?datePublished",
+            "?blogPost schema:dateModified ?dateModified",
+            "?blogPost schema:abstract ?abstract",
+            "?blogPost schema:keywords ?keywords",
+            "?blogPost schema:articleBody ?articleBody",
+        ]
+        
+        construct_clause = "CONSTRUCT {\n    " + " ;\n    ".join(construct_patterns) + "\n}"
+        
+        # WHERE clause
+        where_patterns = [
+            "?blogPost a schema:BlogPosting",
+            "OPTIONAL { ?blogPost rxyz:x ?x }",
+            "OPTIONAL { ?blogPost rxyz:y ?y }",
+            "OPTIONAL { ?blogPost schema:author ?author }",
+            "OPTIONAL { ?blogPost schema:headline ?headline }",
+            "OPTIONAL { ?blogPost schema:datePublished ?datePublished }",
+            "OPTIONAL { ?blogPost schema:dateModified ?dateModified }",
+            "OPTIONAL { ?blogPost schema:abstract ?abstract }",
+            "OPTIONAL { ?blogPost schema:keywords ?keywords }",
+            "OPTIONAL { ?blogPost schema:articleBody ?articleBody }",
+        ]
+        
+        where_clause = "WHERE {\n    " + " .\n    ".join(where_patterns)
+        
+        # Add filter for specific blog post if URI provided
+        if blog_uri:
+            where_clause += f"\n    FILTER (?blogPost = <{blog_uri}>)"
+        
+        where_clause += "\n}"
+        
+        # Add limit if specified
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        
+        return f"{construct_clause}\n{where_clause}{limit_clause}"
