@@ -1,0 +1,98 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix dash: <http://datashapes.org/dash#> .
+
+@prefix schema: <https://schema.org/> .
+@prefix rxyz: <http://rosyc.xyz#> .
+
+rxyz:BlogNodeShape
+    a sh:NodeShape ;
+    rdfs:label "Blog node shape" ;
+    rdfs:comment "Validates Schema.org BlogPosting instances used in the flow UI." ;
+    sh:targetClass schema:BlogPosting ;
+    sh:closed false ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property
+        rxyz:BlogNodeShapeHeadline ,
+        rxyz:BlogNodeShapeAuthor ,
+        rxyz:BlogNodeShapeCoordsX ,
+        rxyz:BlogNodeShapeCoordsY ,
+        rxyz:BlogNodeShapeDatePublished ,
+        rxyz:BlogNodeShapeDateModified ,
+        rxyz:BlogNodeShapeAbstract ,
+        rxyz:BlogNodeShapeKeywords ,
+        rxyz:BlogNodeShapeArticleBody .
+
+rxyz:BlogNodeShapeHeadline
+    a sh:PropertyShape ;
+    sh:path schema:headline ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Blog posts must have a single headline." .
+
+rxyz:BlogNodeShapeAuthor
+    a sh:PropertyShape ;
+    sh:path schema:author ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class schema:Person ;
+    sh:message "Author must reference a schema:Person." .
+
+rxyz:BlogNodeShapeCoordsX
+    a sh:PropertyShape ;
+    sh:path rxyz:x ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
+    sh:message "Blog nodes must carry their x coordinate as an integer." .
+
+rxyz:BlogNodeShapeCoordsY
+    a sh:PropertyShape ;
+    sh:path rxyz:y ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
+    sh:message "Blog nodes must carry their y coordinate as an integer." .
+
+rxyz:BlogNodeShapeDatePublished
+    a sh:PropertyShape ;
+    sh:path schema:datePublished ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:dateTime ;
+    sh:message "Each blog post needs datePublished (xsd:dateTime)." .
+
+rxyz:BlogNodeShapeDateModified
+    a sh:PropertyShape ;
+    sh:path schema:dateModified ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:dateTime ;
+    sh:message "Each blog post needs dateModified (xsd:dateTime)." .
+
+rxyz:BlogNodeShapeAbstract
+    a sh:PropertyShape ;
+    sh:path schema:abstract ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:message "Blog posts require a single abstract/description." .
+
+rxyz:BlogNodeShapeKeywords
+    a sh:PropertyShape ;
+    sh:path schema:keywords ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:message "Provide at least one keyword string per blog post." .
+
+rxyz:BlogNodeShapeArticleBody
+    a sh:PropertyShape ;
+    sh:path schema:articleBody ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:message "Each blog post must include its articleBody string." .

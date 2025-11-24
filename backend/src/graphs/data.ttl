@@ -37,7 +37,7 @@ rxyz:me a schema:Person ;
 rxyz:firstBlogPost a schema:BlogPosting ;
     rxyz:x 0; rxyz:y 0 ;
     schema:author rxyz:me ;
-    schema:headline "What am I looking at?"@en ;
+    schema:headline "What am I looking at?" ;
     schema:datePublished "2025-01-01T00:00:00"^^xsd:dateTime ;
     schema:dateModified "2025-01-01T00:00:00"^^xsd:dateTime ;
     schema:abstract "My very first blog post: a meta article about this website" ;

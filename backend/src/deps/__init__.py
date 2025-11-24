@@ -14,11 +14,17 @@ from .sparql_service import (
     get_sparql_service
 )
 # from .sparql_templater import (
-#     SPARQLTemplater,
+#     SparqlTemplater,
 #     initialize_sparql_templater,
 #     cleanup_sparql_templater,
 #     get_sparql_templater
 # )
+from .shacl_service import (
+    ShaclService,
+    initialize_shacl_service,
+    cleanup_shacl_service,
+    get_shacl_service
+)
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +34,7 @@ logger = logging.getLogger(__name__)
 HttpClientDep = Depends(get_http_client)
 SparqlServiceDep = Depends(get_sparql_service)
 # SparqlTemplaterDep = Depends(get_sparql_templater)
+ShaclServiceDep = Depends(get_shacl_service)
 
 # Lifecycle management functions for application startup/shutdown
 async def initialize_dependencies() -> None:
@@ -35,13 +42,15 @@ async def initialize_dependencies() -> None:
     await initialize_http_client()
     await initialize_sparql_service()
     # await initialize_sparql_templater()
+    await initialize_shacl_service()
     logger.info("All dependencies initialized successfully")
 
 
 async def cleanup_dependencies() -> None:
     """Cleanup all dependencies during application shutdown."""
-    await cleanup_sparql_service()
+    await cleanup_shacl_service()
     # await cleanup_sparql_templater()
+    await cleanup_sparql_service()
     await cleanup_http_client()
     logger.info("All dependencies cleaned up successfully")
 
@@ -61,4 +70,9 @@ __all__ = [
     # "get_sparql_templater",
     # "SPARQLTemplater",
     # "SparqlTemplaterDep",
+
+    "ShaclService",
+    "get_shacl_service",
+    "ShaclServiceDep",
+    
 ]

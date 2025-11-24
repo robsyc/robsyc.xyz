@@ -7,7 +7,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Global HTTP client instance
+# Global HTTP client instance for dependency injection
 _http_client: Optional[httpx.AsyncClient] = None
 
 

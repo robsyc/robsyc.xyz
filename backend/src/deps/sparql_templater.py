@@ -10,11 +10,11 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-# Global instances for dependency injection
-_sparql_templater: Optional['SPARQLTemplater'] = None
+# Global SPARQL templater instance for dependency injection
+_sparql_templater: Optional['SparqlTemplater'] = None
 
 
-class SPARQLTemplater:
+class SparqlTemplater:
     """Generic SPARQL query builder using Jinja2 templates."""
     
     def __init__(self, templates_dir: Optional[Path] = None):
@@ -54,7 +54,7 @@ async def initialize_sparql_templater() -> None:
     """Initialize SPARQL templater."""
     global _sparql_templater
     if _sparql_templater is None:
-        _sparql_templater = SPARQLTemplater()
+        _sparql_templater = SparqlTemplater()
     logger.info("SPARQL templater initialized")
 
 
@@ -66,7 +66,7 @@ async def cleanup_sparql_templater() -> None:
         logger.info("SPARQL templater cleaned up")
 
 
-async def get_sparql_templater() -> SPARQLTemplater:
+async def get_sparql_templater() -> SparqlTemplater:
     """Get SPARQL templater instance."""
     if _sparql_templater is None:
         raise RuntimeError("SPARQL templater not initialized.")

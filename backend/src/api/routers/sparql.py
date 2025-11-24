@@ -18,7 +18,7 @@ router = APIRouter()
 async def execute_sparql_query(
     query: SparqlQuery,
     sparql_service: SparqlService = SparqlServiceDep,
-    ) -> Response:
+) -> Response:
     """Execute a SPARQL query against the triple store."""
     
     result = await sparql_service.query(query.query, query.accept)
@@ -60,7 +60,7 @@ async def get_all_triples(
 @router.get("/count")
 async def count_triples(
     sparql_service: SparqlService = SparqlServiceDep,
-    ) -> Response:
+) -> Response:
     """Count the number of triples in the triple store."""
 
     query = "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }"
@@ -82,7 +82,7 @@ async def count_triples(
 @router.delete("/clear")
 async def clear_triples(
     sparql_service: SparqlService = SparqlServiceDep,
-    ) -> Response:
+) -> Response:
     """Clear all triples from the triple store."""
 
     update_query = "DELETE WHERE { ?s ?p ?o }"
