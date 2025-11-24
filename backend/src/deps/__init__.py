@@ -6,6 +6,7 @@ from .http_client import (
     cleanup_http_client,
     get_http_client
 )
+from .types import SparqlMediaType
 from .sparql_service import (
     SparqlService,
     initialize_sparql_service,
@@ -52,6 +53,7 @@ __all__ = [
     "get_http_client",
     "HttpClientDep",
     
+    "SparqlMediaType",
     "get_sparql_service",
     "SparqlService",
     "SparqlServiceDep",

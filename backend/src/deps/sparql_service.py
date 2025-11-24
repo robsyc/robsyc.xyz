@@ -124,7 +124,16 @@ class SparqlService:
         sparql_query: str, 
         accept: SparqlMediaType = SparqlMediaType.SPARQL_JSON
         ) -> Dict[str, Any]:
-        """Execute a SPARQL query (SELECT, ASK, CONSTRUCT, DESCRIBE) and return results."""
+        """
+        Execute a SPARQL query (SELECT, ASK, CONSTRUCT, DESCRIBE) and return results.
+        
+        Args:
+            sparql_query: The SPARQL query to execute.
+            accept: The media type to accept in the response (default: SPARQL_JSON (application/sparql-results+json)).
+        
+        Returns:
+            A dictionary containing the response content, status code, and media type.
+        """
         query = self._prepare_sparql(sparql_query)
         endpoint = self._get_query_endpoint()
         
@@ -158,9 +167,18 @@ class SparqlService:
     async def update(
         self, 
         sparql_update: str,
-        accept: str = "application/json"
+        accept: SparqlMediaType = SparqlMediaType.APP_JSON
         ) -> Dict[str, Any]:
-        """Execute a SPARQL update (INSERT, DELETE, LOAD) and return results."""
+        """
+        Execute a SPARQL update (INSERT, DELETE, LOAD) and return results.
+        
+        Args:
+            sparql_update: The SPARQL update to execute.
+            accept: The media type to accept in the response (default: APP_JSON (application/json)).
+        
+        Returns:
+            A dictionary containing the response content, status code, and media type.
+        """
         update = self._prepare_sparql(sparql_update)
         endpoint = self._get_update_endpoint()
         

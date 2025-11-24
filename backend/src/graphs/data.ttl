@@ -24,7 +24,7 @@
     vann:preferredNamespaceUri "http://rosyc.xyz#" ;
 .
 
-:me a schema:Person ;
+rxyz:me a schema:Person ;
     schema:givenName "Robbe" ;
     schema:familyName "Claeys" ;
     schema:birthDate "2000-04-03"^^xsd:date ;
@@ -34,9 +34,9 @@
     ] ;
 .
 
-:firstBlogPost a schema:BlogPosting ;
+rxyz:firstBlogPost a schema:BlogPosting ;
     rxyz:x 0; rxyz:y 0 ;
-    schema:author :me ;
+    schema:author rxyz:me ;
     schema:headline "What am I looking at?"@en ;
     schema:datePublished "2025-01-01T00:00:00"^^xsd:dateTime ;
     schema:dateModified "2025-01-01T00:00:00"^^xsd:dateTime ;

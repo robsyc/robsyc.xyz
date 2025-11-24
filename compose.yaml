@@ -43,6 +43,10 @@ services:
     ports:
       - 3000:3000
     environment:
+      - SPARQL_ENDPOINT=http://tentris:9080
+      - SPARQL_PROVIDER=tentris  # Options: "tentris" or "graphdb"
+      # For GraphDB, also set: SPARQL_REPOSITORY=your-repo-name
+      - SEARCH_ENDPOINT=http://meilisearch:7700
       - BACKEND_URL=http://backend:8000
     depends_on:
       - backend

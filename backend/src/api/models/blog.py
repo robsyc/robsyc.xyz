@@ -47,8 +47,8 @@ class BlogPost(BaseRdfModel):
         str, WithPredicate(SDO.abstract)]
     
     keywords: Annotated[
-        Optional[List[str]], WithPredicate(SDO.keywords)
-        ] = None
+        List[str], WithPredicate(SDO.keywords)
+        ] = Field(default_factory=list)
     
     articleBody: Annotated[
         str, WithPredicate(SDO.articleBody)]
@@ -56,57 +56,37 @@ class BlogPost(BaseRdfModel):
     @classmethod
     def construct_query(
         cls,
-        blog_uri: Optional[str] = None,
+        uri: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> str:
         """
         Generate a SPARQL CONSTRUCT query to retrieve blog posts.
         
         Args:
-            blog_uri: Optional URI of a specific blog post to retrieve. If None, retrieves all blog posts.
+            uri: Optional URI of a specific blog post to retrieve. If None, retrieves all blog posts.
             limit: Optional limit on the number of results.
+            # TODO: currently only get last x posts, but we want to enable pagination-like behaviour (use date?)
         
         Returns:
             SPARQL CONSTRUCT query string.
         """
-        construct_patterns = [
-            "?blogPost a schema:BlogPosting",
-            "?blogPost rxyz:x ?x",
-            "?blogPost rxyz:y ?y",
-            "?blogPost schema:author ?author",
-            "?blogPost schema:headline ?headline",
-            "?blogPost schema:datePublished ?datePublished",
-            "?blogPost schema:dateModified ?dateModified",
-            "?blogPost schema:abstract ?abstract",
-            "?blogPost schema:keywords ?keywords",
-            "?blogPost schema:articleBody ?articleBody",
+        graph_patterns = [
+            "?post a schema:BlogPosting",
+            "?post rxyz:x ?x",
+            "?post rxyz:y ?y",
+            "?post schema:author ?author",
+            "?post schema:headline ?headline",
+            "?post schema:datePublished ?datePublished",
+            "?post schema:dateModified ?dateModified",
+            "?post schema:abstract ?abstract",
+            "?post schema:keywords ?keywords",
+            "?post schema:articleBody ?articleBody",
         ]
+        construct_clause = "CONSTRUCT {\n   " + " .\n   ".join(graph_patterns) + "\n}"
+
+        where_clause = "WHERE {\n   "
+        where_clause += f"VALUES (?post {{ ( <{uri}> ) }})" if uri else ""
+        where_clause += " .\n   ".join(graph_patterns) + "\n}"
+        modifiers = f"ORDER BY DESC(?datePublished) LIMIT {limit}" if limit else ""
         
-        construct_clause = "CONSTRUCT {\n    " + " ;\n    ".join(construct_patterns) + "\n}"
-        
-        # WHERE clause
-        where_patterns = [
-            "?blogPost a schema:BlogPosting",
-            "OPTIONAL { ?blogPost rxyz:x ?x }",
-            "OPTIONAL { ?blogPost rxyz:y ?y }",
-            "OPTIONAL { ?blogPost schema:author ?author }",
-            "OPTIONAL { ?blogPost schema:headline ?headline }",
-            "OPTIONAL { ?blogPost schema:datePublished ?datePublished }",
-            "OPTIONAL { ?blogPost schema:dateModified ?dateModified }",
-            "OPTIONAL { ?blogPost schema:abstract ?abstract }",
-            "OPTIONAL { ?blogPost schema:keywords ?keywords }",
-            "OPTIONAL { ?blogPost schema:articleBody ?articleBody }",
-        ]
-        
-        where_clause = "WHERE {\n    " + " .\n    ".join(where_patterns)
-        
-        # Add filter for specific blog post if URI provided
-        if blog_uri:
-            where_clause += f"\n    FILTER (?blogPost = <{blog_uri}>)"
-        
-        where_clause += "\n}"
-        
-        # Add limit if specified
-        limit_clause = f" LIMIT {limit}" if limit else ""
-        
-        return f"{construct_clause}\n{where_clause}{limit_clause}"
+        return f"{construct_clause}\n{where_clause}{modifiers}"
