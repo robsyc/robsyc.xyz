@@ -1,0 +1,229 @@
+import { Store, Parser, Writer, DataFactory, Reasoner } from 'n3';
+import type { Quad, NamedNode, Term, Quad_Subject, Quad_Predicate, Quad_Object, Quad_Graph } from 'n3';
+import Validator from 'shacl-engine/Validator.js'
+import { RDF, PREFIXES } from '$lib/rdf/namespaces';
+
+// N3.DataFactory will give you the factory functions to create triples and quads
+// http://rdf.js.org/#datafactory-interface
+const { namedNode, literal, quad } = DataFactory;
+
+/**
+ * Reactive RDF Store wrapper around N3.Store using Svelte 5 runes.
+ * Provides methods to load, query, and manipulate RDF triples.
+ */
+export class RdfStore {
+    // // N3.Writer serializes quads as an RDF document. Write quads through addQuad
+    // // can write quads to a Node.js stream through addQuad
+    // writer = new Writer({ format: 'N-Triples' });
+
+    // N3.Store for in-memory triple storage
+    // N3.Store allows you to store triples in memory and find them fast
+    // If you are using multiple stores, you can reduce memory consumption by allowing them to share an entity index
+    #store = new Store();
+    
+    // Reactive version counter - increment to trigger re-derivation
+    version = $state(0);
+    
+    // Track loaded sources
+    #loadedUrls = new Set<string>();
+
+    // Parser for Turtle/N-Triples/etc
+    // N3.Parser transforms Turtle, TriG, N-Triples, or N-Quads document into quads through a callback
+    // can parse Node.js streams as they grow, returning quads as soon as they're ready
+    #parser = new Parser();
+    // Node.js streams: http://nodejs.org/api/stream.html
+    // RDF.js sink: http://rdf.js.org/#sink-interface
+
+
+    /**
+     * Get the underlying N3 store (for advanced queries)
+     */
+    get store(): Store {
+        return this.#store;
+    }
+
+    /**
+     * Get current quad count (reactive)
+     */
+    get size(): number {
+        // Access version to make this reactive
+        this.version;
+        return this.#store.size;
+    }
+
+    /**
+     * Load and parse Turtle content from a URL
+     */
+    async loadFromUrl(url: string): Promise<void> {
+        if (this.#loadedUrls.has(url)) {
+            console.log(`[RdfStore] Already loaded: ${url}`);
+            return;
+        }
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+            }
+            const turtleContent = await response.text();
+            this.loadTurtle(turtleContent, url);
+            this.#loadedUrls.add(url);
+            console.log(`[RdfStore] Loaded ${url}, store now has ${this.#store.size} quads`);
+        } catch (error) {
+            console.error(`[RdfStore] Error loading ${url}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Parse and add Turtle string to the store
+     */
+    loadTurtle(turtleContent: string, baseIRI?: string): void {
+        const parser = new Parser({ baseIRI });
+        const quads = parser.parse(turtleContent);
+        this.#store.addQuads(quads);
+        this.version++;
+    }
+
+    /**
+     * Add a single quad to the store
+     */
+    addQuad(subject: Quad_Subject, predicate: Quad_Predicate, object: Quad_Object, graph?: Quad_Graph): void {
+        this.#store.addQuad(subject, predicate, object, graph);
+        this.version++;
+    }
+
+    /**
+     * Add multiple quads to the store
+     */
+    addQuads(quads: Quad[]): void {
+        this.#store.addQuads(quads);
+        this.version++;
+    }
+
+    /**
+     * Remove a quad from the store
+     */
+    removeQuad(quad: Quad): void {
+        this.#store.removeQuad(quad);
+        this.version++;
+    }
+
+    /**
+     * Get all quads matching a pattern (null = wildcard)
+     */
+    getQuads(
+        subject?: Term | null,
+        predicate?: Term | null,
+        object?: Term | null,
+        graph?: Term | null
+    ): Quad[] {
+        return this.#store.getQuads(subject ?? null, predicate ?? null, object ?? null, graph ?? null);
+    }
+
+    /**
+     * Get all resources (subjects) of a given rdf:type
+     */
+    getResourcesByType(typeIRI: string | NamedNode): NamedNode[] {
+        const typeNode = typeof typeIRI === 'string' ? namedNode(typeIRI) : typeIRI;
+        const quads = this.#store.getQuads(null, RDF.type, typeNode, null);
+        
+        // Return unique subjects as NamedNodes
+        const subjects = new Set<string>();
+        const result: NamedNode[] = [];
+        
+        for (const q of quads) {
+            const subjectValue = q.subject.value;
+            if (!subjects.has(subjectValue) && q.subject.termType === 'NamedNode') {
+                subjects.add(subjectValue);
+                result.push(q.subject as NamedNode);
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Get all data for a specific resource (subject)
+     * Returns a Map of predicate IRI -> array of object values
+     */
+    getResourceData(subjectIRI: string | NamedNode): Map<string, Term[]> {
+        const subjectNode = typeof subjectIRI === 'string' ? namedNode(subjectIRI) : subjectIRI;
+        const quads = this.#store.getQuads(subjectNode, null, null, null);
+        
+        const data = new Map<string, Term[]>();
+        for (const q of quads) {
+            const predIRI = q.predicate.value;
+            if (!data.has(predIRI)) {
+                data.set(predIRI, []);
+            }
+            data.get(predIRI)!.push(q.object);
+        }
+        
+        return data;
+    }
+
+    /**
+     * Get a single value for a predicate (first match)
+     */
+    getValue(subject: Term | string, predicate: Term | string): Term | undefined {
+        const subjectNode = typeof subject === 'string' ? namedNode(subject) : subject;
+        const predicateNode = typeof predicate === 'string' ? namedNode(predicate) : predicate;
+        const quads = this.#store.getQuads(subjectNode, predicateNode, null, null);
+        return quads[0]?.object;
+    }
+
+    /**
+     * Get all values for a predicate
+     */
+    getValues(subject: Term | string, predicate: Term | string): Term[] {
+        const subjectNode = typeof subject === 'string' ? namedNode(subject) : subject;
+        const predicateNode = typeof predicate === 'string' ? namedNode(predicate) : predicate;
+        const quads = this.#store.getQuads(subjectNode, predicateNode, null, null);
+        return quads.map(q => q.object);
+    }
+
+    /**
+     * Serialize quads to N-Triples format
+     */
+    toNTriples(quads?: Quad[]): string {
+        const writer = new Writer({ format: 'N-Triples' });
+        const quadsToWrite = quads ?? this.#store.getQuads(null, null, null, null);
+        writer.addQuads(quadsToWrite);
+        
+        let result = '';
+        writer.end((error, output) => {
+            if (error) throw error;
+            result = output;
+        });
+        return result;
+    }
+
+    /**
+     * Serialize quads to Turtle format
+     */
+    toTurtle(quads?: Quad[]): string {
+        const writer = new Writer({ prefixes: PREFIXES });
+        const quadsToWrite = quads ?? this.#store.getQuads(null, null, null, null);
+        writer.addQuads(quadsToWrite);
+        
+        let result = '';
+        writer.end((error, output) => {
+            if (error) throw error;
+            result = output;
+        });
+        return result;
+    }
+
+    /**
+     * Clear all quads from the store
+     */
+    clear(): void {
+        this.#store = new Store();
+        this.#loadedUrls.clear();
+        this.version++;
+    }
+}
+
+// Default global store instance
+export const rdfStore = new RdfStore();

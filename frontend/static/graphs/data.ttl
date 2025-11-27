@@ -1,0 +1,53 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix schema: <https://schema.org/> .
+@prefix vann: <http://purl.org/vocab/vann/> .
+@prefix dc: <http://purl.org/dc/terms/> .
+
+# These are not used, but we should create an ontology to materialize all these equivalences
+# @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+# @prefix sioc: <http://rdfs.org/sioc/ns#> .
+# @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+# @prefix cito: <http://purl.org/spar/cito/> .
+# @prefix prov: <http://www.w3.org/ns/prov#> .
+
+@prefix rxyz: <http://rosyc.xyz#> .
+@base <http://rosyc.xyz#> .
+
+<http://rosyc.xyz#> a owl:Ontology ;
+    dc:description "robsyc's personal knowledge graph"@en ;
+    dc:title "robsyc KG"@en ;
+    vann:preferredNamespacePrefix "rxyz" ;
+    vann:preferredNamespaceUri "http://rosyc.xyz#" ;
+.
+
+rxyz:me a schema:Person ;
+    schema:givenName "Robbe" ;
+    schema:familyName "Claeys" ;
+    schema:birthDate "2000-04-03"^^xsd:date ;
+    schema:birthPlace [
+        a schema:Place ;
+        schema:name "Ghent, Belgium" ;
+    ] ;
+.
+
+rxyz:firstBlogPost a schema:BlogPosting ;
+    rxyz:x 0; rxyz:y 0 ;
+    schema:author rxyz:me ;
+    schema:headline "What am I looking at?" ;
+    schema:datePublished "2025-01-01T00:00:00"^^xsd:dateTime ;
+    schema:dateModified "2025-01-01T00:00:00"^^xsd:dateTime ;
+    schema:abstract "My very first blog post: a meta article about this website" ;
+    schema:keywords "Semantic web", "Node-based UIs" ;
+    schema:articleBody """Welcome to my revamped personal website and knowledge graph `robsyc.xyz` !
+
+The goal of this web application is three fold:
+1. To bridge traditional semantic web technologies with contemporary web development and machine learning practices. 
+2. To express my thoughts, opinions and beliefs and to share my work in a structured machine- and human-readable way.
+3. To fuck around a bit; a playground for tinkering with shit that vaguely interest me.
+
+Expect unconventional UX, radical takes, and my occasional stab at zoomer-humor. I sincerely hope you enjoy lurking through my brain!""" ; 
+. 

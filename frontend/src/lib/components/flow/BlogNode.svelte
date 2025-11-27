@@ -1,17 +1,58 @@
 <script lang="ts">
   import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+  import { DataFactory } from 'n3';
   let { id, data, selected }: NodeProps = $props();
 
   import { Button, buttonVariants } from "$lib/components/ui/button/index.js";
   import * as Card from "$lib/components/ui/card/index.js";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
+  import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
 
-  import { ChevronsRight, SmilePlus, MessageCircle } from "@lucide/svelte";
+  import { ChevronsRight, Code2 } from "@lucide/svelte";
 
-  import { marked } from 'marked'
-  // mdsvex might be more rich but let's see how far we can get with marked
+  import { marked } from 'marked';
+  import { rdfStore } from '$lib/stores/rdf.svelte';
+  import { shortenIRI } from '$lib/rdf/flow-mapper';
+
+  const { namedNode } = DataFactory;
+
+  // Get the IRI from node data (set by flow-mapper)
+  const iri = (data as { iri?: string }).iri || id;
   
+  // Reactive triples display
+  let triplesText = $derived.by(() => {
+    // Access version to trigger re-computation when store changes
+    rdfStore.version;
+    
+    const quads = rdfStore.getQuads(namedNode(iri), null, null, null);
+    if (quads.length === 0) {
+      return 'No triples found for this resource.';
+    }
+    
+    return quads.map(q => {
+      const subject = shortenIRI(q.subject.value);
+      const predicate = shortenIRI(q.predicate.value);
+      let object: string;
+      
+      if (q.object.termType === 'Literal') {
+        // Format literals with quotes
+        const value = q.object.value.length > 100 
+          ? q.object.value.substring(0, 100) + '...' 
+          : q.object.value;
+        object = `"${value}"`;
+        if (q.object.language) {
+          object += `@${q.object.language}`;
+        } else if (q.object.datatype && !q.object.datatype.value.includes('string')) {
+          object += `^^${shortenIRI(q.object.datatype.value)}`;
+        }
+      } else {
+        object = shortenIRI(q.object.value);
+      }
+      
+      return `${subject} ${predicate} ${object} .`;
+    }).join('\n');
+  });
 </script>
 
 <div class="selectable rounded-xl ring-ring" class:ring-2={selected}>
@@ -28,18 +69,29 @@
     </Card.Header>
 
     <Card.Content>
-      <div class="flex justify-between w-full">
-        <!-- <Button disabled variant="outline" size="sm">
-          <SmilePlus />React
-          TODO: Popover with reactions 
-        </Button>
-        <Button disabled variant="outline" size="sm">
-          <MessageCircle />Comment
-          TODO: Dialog with form 
-        </Button> -->
+      <div class="flex gap-2 w-full">
+        <!-- View Triples Button -->
+        <Dialog.Root>
+          <Dialog.Trigger class={buttonVariants({ variant: "outline", size: "sm" })}>
+            <Code2 class="h-4 w-4" />RDF
+          </Dialog.Trigger>
+          <Dialog.Content class="sm:max-w-2xl">
+            <Dialog.Header>
+              <Dialog.Title>RDF Triples</Dialog.Title>
+              <Dialog.Description>
+                Underlying triples for: <code class="text-xs bg-muted px-1 py-0.5 rounded">{shortenIRI(iri)}</code>
+              </Dialog.Description>
+            </Dialog.Header>
+            <ScrollArea class="h-[300px] w-full rounded-md border p-4">
+              <pre class="text-xs font-mono whitespace-pre-wrap break-all">{triplesText}</pre>
+            </ScrollArea>
+          </Dialog.Content>
+        </Dialog.Root>
+
+        <!-- Open Content Button -->
         <Dialog.Root>
           <Dialog.Trigger class={buttonVariants({ variant: "default", size: "sm" })}>
-            <ChevronsRight />Open
+            <ChevronsRight class="h-4 w-4" />Open
           </Dialog.Trigger>
           <Dialog.Content class="sm:max-w-2xl lg:max-w-5xl">
             <Dialog.Header>
