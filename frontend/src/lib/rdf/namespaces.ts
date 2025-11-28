@@ -52,7 +52,10 @@ export const RXYZ = {
 } as const;
 
 // Helper to create a namespaced named node
-export function ns(prefix: keyof typeof PREFIXES, localName: string) {
+export function ns(
+    prefix: keyof typeof PREFIXES, 
+    localName: string
+) {
     return namedNode(`${PREFIXES[prefix]}${localName}`);
 }
 

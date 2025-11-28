@@ -11,7 +11,7 @@
 
   import { ChevronsRight, Code2 } from "@lucide/svelte";
 
-  import { marked } from 'marked';
+  import { marked } from 'marked'; // mdsvex?
   import { rdfStore } from '$lib/stores/rdf.svelte';
   import { shortenIRI } from '$lib/rdf/flow-mapper';
 
@@ -21,6 +21,10 @@
   const iri = (data as { iri?: string }).iri || id;
   
   // Reactive triples display
+  // This is a kind of cheap approach;
+  // Basically just gets all triples from store where this node id is the subject
+  // no shacl, no sparql, no serialization; I think we way need a dedicated slot in the node data for all relevant triples
+  // Could be interesting to add an infernece mode in this view to see that :me a :Primate
   let triplesText = $derived.by(() => {
     // Access version to trigger re-computation when store changes
     rdfStore.version;
@@ -60,6 +64,9 @@
 
   <Card.Root class="hover:shadow-foreground/8 hover:shadow-[0_0_8px_6px] transition-shadow duration-200 w-sm">
 
+    <!-- TODO: we want to express linked data for SEO w/ RDFa and/or json-ld injection 
+     An alternative approach would be to encode the desired semantics in shacl or owl that should be included in properties/attributes of the node data objects
+     -->
     <Card.Header>
       <div class="flex justify-between items-center pb-2">
         <Card.Title>{data.title}</Card.Title>
@@ -79,11 +86,24 @@
             <Dialog.Header>
               <Dialog.Title>RDF Triples</Dialog.Title>
               <Dialog.Description>
-                Underlying triples for: <code class="text-xs bg-muted px-1 py-0.5 rounded">{shortenIRI(iri)}</code>
+                Underlying triples for: <code class="text-xs bg-muted px-1 py-0.5 rounded">
+                  {shortenIRI(iri)}
+                  {#if triplesText}
+                    ({triplesText.split('\n').length} triples)
+                  {:else}
+                    (0 triples)
+                  {/if}
+                </code>
               </Dialog.Description>
             </Dialog.Header>
             <ScrollArea class="h-[300px] w-full rounded-md border p-4">
-              <pre class="text-xs font-mono whitespace-pre-wrap break-all">{triplesText}</pre>
+              <pre class="text-xs font-mono whitespace-pre-wrap break-all">
+                {#if triplesText}
+                  {triplesText}
+                {:else}
+                  No triples found for this resource.
+                {/if}
+              </pre>
             </ScrollArea>
           </Dialog.Content>
         </Dialog.Root>

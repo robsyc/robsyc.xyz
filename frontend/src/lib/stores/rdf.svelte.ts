@@ -10,14 +10,18 @@ const { namedNode, literal, quad } = DataFactory;
 /**
  * Reactive RDF Store wrapper around N3.Store using Svelte 5 runes.
  * Provides methods to load, query, and manipulate RDF triples.
+ *  - Reactive version counter for triggering derived computations
+ *  - loadFromUrl(url) - Fetch and parse TTL files
+ *  - loadTurtle(content) - Parse turtle strings
+ *  - getResourcesByType(typeIRI) - Query resources by rdf:type
+ *  - getResourceData(subject) - Get all predicates/objects for a subject
+ *  - getValue/getValues - Single/multiple value helpers
+ *  - toNTriples/toTurtle - Serialization methods
+ *  - clear() - Clear all quads from the store
  */
 export class RdfStore {
-    // // N3.Writer serializes quads as an RDF document. Write quads through addQuad
-    // // can write quads to a Node.js stream through addQuad
-    // writer = new Writer({ format: 'N-Triples' });
 
     // N3.Store for in-memory triple storage
-    // N3.Store allows you to store triples in memory and find them fast
     // If you are using multiple stores, you can reduce memory consumption by allowing them to share an entity index
     #store = new Store();
     
@@ -219,9 +223,9 @@ export class RdfStore {
      * Clear all quads from the store
      */
     clear(): void {
-        this.#store = new Store();
-        this.#loadedUrls.clear();
-        this.version++;
+        this.#store = new Store(); // renew the store
+        this.#loadedUrls.clear();  // clear the loaded URLs
+        this.version++;  // increment the version to trigger a re-derivation
     }
 }
 

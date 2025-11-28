@@ -18,6 +18,10 @@ export interface BlogNodeData {
     // Store the original IRI for triple inspection
     iri: string;
 }
+// TODO
+// - arbitary complex annotations w/ triples, not just the main entity's IRI and first neighbours...
+// - we should use different kinds of UI nodes for different kinds of entities (shacl shapes, owl classes, data)
+// - a single blog instance is thus data according to its shape & semantically annoated w/ owl inference (e.g. Person is a Primate)
 
 /**
  * Registry mapping rdf:type IRIs to SvelteFlow node types
@@ -29,13 +33,29 @@ export const NODE_TYPE_REGISTRY: Record<string, string> = {
 };
 
 /**
+ * Get the SvelteFlow node type for an RDF resource based on its rdf:type
+ */
+function getNodeType(store: RdfStore, subject: NamedNode): string | null {
+    const types = store.getValues(subject, RDF.type);
+    
+    for (const typeNode of types) {
+        const nodeType = NODE_TYPE_REGISTRY[typeNode.value];
+        if (nodeType) {
+            return nodeType;
+        }
+    }
+    
+    return null;
+}
+
+/****************************************************************************************
  * Extract a string value from an RDF term
+ * These helper functions are used to extract values for populating a BlogNodeData object
  */
 function termToString(term: Term | undefined): string {
     if (!term) return '';
     return term.value;
 }
-
 /**
  * Extract a number from an RDF term (for coordinates)
  */
@@ -47,6 +67,7 @@ function termToNumber(term: Term | undefined, defaultValue: number = 0): number 
 
 /**
  * Format a date string for display (from xsd:dateTime or xsd:date)
+ * NOTE: same here (why not UTC?)
  */
 function formatDate(term: Term | undefined): string {
     if (!term) return '';
@@ -67,29 +88,14 @@ function formatDate(term: Term | undefined): string {
     return value;
 }
 
-/**
- * Get the SvelteFlow node type for an RDF resource based on its rdf:type
- */
-function getNodeType(store: RdfStore, subject: NamedNode): string | null {
-    const types = store.getValues(subject, RDF.type);
-    
-    for (const typeNode of types) {
-        const nodeType = NODE_TYPE_REGISTRY[typeNode.value];
-        if (nodeType) {
-            return nodeType;
-        }
-    }
-    
-    return null;
-}
-
-/**
+/****************************************************************************************
  * Convert a BlogPosting resource to BlogNode data
  */
 function blogPostingToNodeData(store: RdfStore, subject: NamedNode): BlogNodeData {
     const keywords = store.getValues(subject, SCHEMA.keywords);
     
     return {
+        // NOTE: store.getValue gets the first match, might need more logic like most recently authored (future)
         title: termToString(store.getValue(subject, SCHEMA.headline)),
         date: formatDate(store.getValue(subject, SCHEMA.datePublished)),
         description: termToString(store.getValue(subject, SCHEMA.abstract)),
@@ -109,8 +115,11 @@ function getPosition(store: RdfStore, subject: NamedNode): { x: number; y: numbe
     };
 }
 
-/**
+/****************************************************************************************
  * Convert RDF store contents to SvelteFlow nodes and edges
+ * Two passes:
+ * 1. Create nodes for all visualizable resources using a switch statement to the node data builder
+ * 2. Create edges for object properties pointing to other *visualizable* nodes (direct links only)
  */
 export function quadsToFlowElements(store: RdfStore): { nodes: Node[]; edges: Edge[] } {
     const nodes: Node[] = [];
@@ -139,8 +148,8 @@ export function quadsToFlowElements(store: RdfStore): { nodes: Node[]; edges: Ed
             }
             
             nodes.push({
-                id: subject.value,
-                type: nodeType,
+                id: subject.value, // node id is the IRI of the resource
+                type: nodeType, // node type is determined w/ NODE_TYPE_REGISTRY
                 position,
                 data: data as Record<string, unknown>,
             });
@@ -151,6 +160,7 @@ export function quadsToFlowElements(store: RdfStore): { nodes: Node[]; edges: Ed
     
     // Second pass: create edges for object properties pointing to other nodes
     // (e.g., schema:author pointing to a Person node)
+    // NOTE: Currently not yet utilized by the data, there also is no Person node type
     for (const nodeIRI of nodeIRIs) {
         const quads = store.getQuads(namedNode(nodeIRI), null, null, null);
         
@@ -160,6 +170,11 @@ export function quadsToFlowElements(store: RdfStore): { nodes: Node[]; edges: Ed
                 const targetIRI = quad.object.value;
                 
                 // Only create edge if target is also a visualized node
+                // NOTE: only direct links are supported, also what if 
+                // - graph pattern we want to express is indirect & type dependent (e.g. tags used in a person's blog posts)
+                // - multiple predicates between two individual nodes
+                // - special edges (inverse, transitive, etc.)
+                // - edges treated as nodes (maybe too far fetched since we filter out non-UI visualizable resources)
                 if (nodeIRIs.has(targetIRI)) {
                     edges.push({
                         id: `${nodeIRI}-${quad.predicate.value}-${targetIRI}`,
@@ -177,9 +192,12 @@ export function quadsToFlowElements(store: RdfStore): { nodes: Node[]; edges: Ed
 
 /**
  * Get a human-readable label for a predicate IRI
+ * (used in quadsToFlowElements to set the edge label)
  */
 function getPredicateLabel(predicateIRI: string): string {
     // Extract local name from IRI
+    // NOTE: is approach ignores that predicates can have labels themselves
+    // we should perhaps pass on the store to this function to get the label
     const hashIndex = predicateIRI.lastIndexOf('#');
     const slashIndex = predicateIRI.lastIndexOf('/');
     const separatorIndex = Math.max(hashIndex, slashIndex);
@@ -191,9 +209,13 @@ function getPredicateLabel(predicateIRI: string): string {
     return predicateIRI;
 }
 
-/**
+/****************************************************************************************
  * Convert a SvelteFlow node back to RDF quads (for persistence)
+ * NOTE: This is NOT being used in +page.svelte
  * Note: This is a simplified implementation for BlogPosting nodes
+ * Ideally, this mapping should be inferred from SHACL somehow
+ * Otherwise we will need both a blogPostingToNodeData & flowNodeToQuads function for each node type
+ * Long term: would be nice to automatically build classes w/ methods from shacl in js or Pydantic maybe?
  */
 export function flowNodeToQuads(node: Node): { subject: string; predicates: Array<{ p: string; o: string }> } {
     const data = node.data as unknown as BlogNodeData;
