@@ -37,13 +37,51 @@ export const SCHEMA = {
 } as const;
 
 export const SH = {
+    // https://www.w3.org/TR/shacl/
+    // https://www.validatingrdf.com/tutorial/eswc2025/slides/04_SHACL_Primer.pdf
+    // Shape types
     NodeShape: namedNode(`${PREFIXES.sh}NodeShape`),
+    PropertyShape: namedNode(`${PREFIXES.sh}PropertyShape`),
+    // Targets
     targetClass: namedNode(`${PREFIXES.sh}targetClass`),
-    property: namedNode(`${PREFIXES.sh}property`),
-    path: namedNode(`${PREFIXES.sh}path`),
+    targetNode: namedNode(`${PREFIXES.sh}targetNode`),
+    // Property constraints
+    property: namedNode(`${PREFIXES.sh}property`), // links a node shape to a property shape
+    path: namedNode(`${PREFIXES.sh}path`), // the predicate IRI a property shape constrains
     datatype: namedNode(`${PREFIXES.sh}datatype`),
+    class: namedNode(`${PREFIXES.sh}class`),
+    nodeKind: namedNode(`${PREFIXES.sh}nodeKind`),
+    // Cardinality
     minCount: namedNode(`${PREFIXES.sh}minCount`),
     maxCount: namedNode(`${PREFIXES.sh}maxCount`),
+    // Shape metadata
+    closed: namedNode(`${PREFIXES.sh}closed`),
+    ignoredProperties: namedNode(`${PREFIXES.sh}ignoredProperties`),
+    message: namedNode(`${PREFIXES.sh}message`),
+    name: namedNode(`${PREFIXES.sh}name`),
+    description: namedNode(`${PREFIXES.sh}description`),
+    order: namedNode(`${PREFIXES.sh}order`), // TODO: more with DASH!
+    group: namedNode(`${PREFIXES.sh}group`), // TODO: use to build shadcn forms!
+    // Node kinds (values for sh:nodeKind)
+    IRI: namedNode(`${PREFIXES.sh}IRI`),
+    BlankNode: namedNode(`${PREFIXES.sh}BlankNode`),
+    Literal: namedNode(`${PREFIXES.sh}Literal`),
+    BlankNodeOrIRI: namedNode(`${PREFIXES.sh}BlankNodeOrIRI`),
+    BlankNodeOrLiteral: namedNode(`${PREFIXES.sh}BlankNodeOrLiteral`),
+    IRIOrLiteral: namedNode(`${PREFIXES.sh}IRIOrLiteral`),
+} as const;
+
+export const XSD = {
+    string: namedNode(`${PREFIXES.xsd}string`),
+    integer: namedNode(`${PREFIXES.xsd}integer`),
+    decimal: namedNode(`${PREFIXES.xsd}decimal`),
+    float: namedNode(`${PREFIXES.xsd}float`),
+    double: namedNode(`${PREFIXES.xsd}double`),
+    boolean: namedNode(`${PREFIXES.xsd}boolean`),
+    date: namedNode(`${PREFIXES.xsd}date`),
+    dateTime: namedNode(`${PREFIXES.xsd}dateTime`),
+    time: namedNode(`${PREFIXES.xsd}time`),
+    anyURI: namedNode(`${PREFIXES.xsd}anyURI`),
 } as const;
 
 export const RXYZ = {

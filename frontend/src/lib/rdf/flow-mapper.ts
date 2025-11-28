@@ -1,13 +1,67 @@
+/**
+ * SHACL-Driven Flow Mapper
+ * 
+ * Converts RDF store contents to SvelteFlow nodes and edges using SHACL shapes
+ * as the source of truth for entity type mapping and property extraction.
+ */
+
 import type { Node, Edge } from '@xyflow/svelte';
 import { DataFactory } from 'n3';
-import type { NamedNode, Term } from 'n3';
+import type { NamedNode } from 'n3';
 import type { RdfStore } from '$lib/stores/rdf.svelte';
-import { SCHEMA, RXYZ, RDF, PREFIXES } from './namespaces';
+import { RXYZ, RDFS } from './namespaces';
+import { 
+    buildShapeRegistry, 
+    type ShapeRegistry, 
+    type NodeShape,
+    type PropertyShape,
+} from './shacl-parser';
+import { 
+    getLocalName, 
+    shortenIRI, 
+    termToNumber, 
+    formatDate,
+} from './utils';
 
 const { namedNode } = DataFactory;
 
+/****************************************************************************************
+ * Node Data Interfaces
+ * 
+ * ShapeNodeData is the generic shape-driven data structure.
+ * BlogNodeData is maintained for backward compatibility with BlogNode.svelte.
+ */
+
 /**
- * BlogNode data interface matching BlogNode.svelte expectations
+ * Generic shape-driven node data
+ * Contains all properties extracted based on the shape definition
+ */
+export interface ShapeNodeData {
+    iri: string;
+    shapeIRI: string;
+    shapeLabel?: string;
+    targetClass: string;
+    targetClassLocalName: string;
+    // Dynamic properties extracted from shape - keyed by property path local name
+    properties: Record<string, PropertyValue>;
+}
+
+/**
+ * A property value extracted from RDF
+ */
+export interface PropertyValue {
+    path: string;           // Full predicate IRI
+    localName: string;      // Local name for display
+    values: string[];       // All values (as strings)
+    value: string;          // First value (convenience)
+    datatype?: string;      // XSD datatype if known
+    isMultiValued: boolean;
+    isRequired: boolean;
+}
+
+/**
+ * BlogNode data interface - maintained for backward compatibility
+ * Maps ShapeNodeData properties to the expected BlogNode.svelte format
  */
 export interface BlogNodeData {
     title: string;
@@ -15,95 +69,14 @@ export interface BlogNodeData {
     description: string;
     tags: string[];
     content: string;
-    // Store the original IRI for triple inspection
     iri: string;
-}
-// TODO
-// - arbitary complex annotations w/ triples, not just the main entity's IRI and first neighbours...
-// - we should use different kinds of UI nodes for different kinds of entities (shacl shapes, owl classes, data)
-// - a single blog instance is thus data according to its shape & semantically annoated w/ owl inference (e.g. Person is a Primate)
-
-/**
- * Registry mapping rdf:type IRIs to SvelteFlow node types
- */
-export const NODE_TYPE_REGISTRY: Record<string, string> = {
-    [SCHEMA.BlogPosting.value]: 'blog',
-    // Add more mappings as needed:
-    // [SCHEMA.Person.value]: 'person',
-};
-
-/**
- * Get the SvelteFlow node type for an RDF resource based on its rdf:type
- */
-function getNodeType(store: RdfStore, subject: NamedNode): string | null {
-    const types = store.getValues(subject, RDF.type);
-    
-    for (const typeNode of types) {
-        const nodeType = NODE_TYPE_REGISTRY[typeNode.value];
-        if (nodeType) {
-            return nodeType;
-        }
-    }
-    
-    return null;
+    // Include shape info for future use
+    shapeIRI?: string;
 }
 
 /****************************************************************************************
- * Extract a string value from an RDF term
- * These helper functions are used to extract values for populating a BlogNodeData object
+ * Position Extraction
  */
-function termToString(term: Term | undefined): string {
-    if (!term) return '';
-    return term.value;
-}
-/**
- * Extract a number from an RDF term (for coordinates)
- */
-function termToNumber(term: Term | undefined, defaultValue: number = 0): number {
-    if (!term) return defaultValue;
-    const num = parseFloat(term.value);
-    return isNaN(num) ? defaultValue : num;
-}
-
-/**
- * Format a date string for display (from xsd:dateTime or xsd:date)
- * NOTE: same here (why not UTC?)
- */
-function formatDate(term: Term | undefined): string {
-    if (!term) return '';
-    const value = term.value;
-    // Try to parse as date and format nicely
-    try {
-        const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-            return date.toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
-            });
-        }
-    } catch {
-        // Fall through to return raw value
-    }
-    return value;
-}
-
-/****************************************************************************************
- * Convert a BlogPosting resource to BlogNode data
- */
-function blogPostingToNodeData(store: RdfStore, subject: NamedNode): BlogNodeData {
-    const keywords = store.getValues(subject, SCHEMA.keywords);
-    
-    return {
-        // NOTE: store.getValue gets the first match, might need more logic like most recently authored (future)
-        title: termToString(store.getValue(subject, SCHEMA.headline)),
-        date: formatDate(store.getValue(subject, SCHEMA.datePublished)),
-        description: termToString(store.getValue(subject, SCHEMA.abstract)),
-        tags: keywords.map(k => k.value),
-        content: termToString(store.getValue(subject, SCHEMA.articleBody)),
-        iri: subject.value,
-    };
-}
 
 /**
  * Get position from rxyz:x and rxyz:y predicates
@@ -116,137 +89,186 @@ function getPosition(store: RdfStore, subject: NamedNode): { x: number; y: numbe
 }
 
 /****************************************************************************************
- * Convert RDF store contents to SvelteFlow nodes and edges
- * Two passes:
- * 1. Create nodes for all visualizable resources using a switch statement to the node data builder
- * 2. Create edges for object properties pointing to other *visualizable* nodes (direct links only)
+ * Shape-Driven Data Extraction
  */
-export function quadsToFlowElements(store: RdfStore): { nodes: Node[]; edges: Edge[] } {
+
+/**
+ * Extract a PropertyValue from the store based on a PropertyShape
+ */
+function extractPropertyValue(
+    store: RdfStore, 
+    subject: NamedNode, 
+    propShape: PropertyShape
+): PropertyValue {
+    const pathNode = namedNode(propShape.path);
+    const terms = store.getValues(subject, pathNode);
+    const values = terms.map(t => t.value);
+    
+    return {
+        path: propShape.path,
+        localName: propShape.pathLocalName,
+        values,
+        value: values[0] ?? '',
+        datatype: propShape.datatype,
+        isMultiValued: propShape.maxCount === undefined || propShape.maxCount > 1,
+        isRequired: (propShape.minCount ?? 0) >= 1,
+    };
+}
+
+/**
+ * Extract all property values for a resource based on its shape
+ */
+function extractShapeData(
+    store: RdfStore, 
+    subject: NamedNode, 
+    shape: NodeShape
+): ShapeNodeData {
+    const properties: Record<string, PropertyValue> = {};
+    
+    // Extract each property defined in the shape
+    for (const propShape of shape.properties) {
+        const propValue = extractPropertyValue(store, subject, propShape);
+        properties[propShape.pathLocalName] = propValue;
+    }
+    
+    return {
+        iri: subject.value,
+        shapeIRI: shape.iri,
+        shapeLabel: shape.label,
+        targetClass: shape.targetClass,
+        targetClassLocalName: shape.targetClassLocalName,
+        properties,
+    };
+}
+
+/**
+ * Convert ShapeNodeData to BlogNodeData for backward compatibility
+ * Maps the generic shape properties to the specific BlogNode format
+ */
+function shapeDataToBlogData(shapeData: ShapeNodeData): BlogNodeData {
+    const props = shapeData.properties;
+    
+    return {
+        title: props['headline']?.value ?? '',
+        date: formatDate(props['datePublished']?.value ?? ''),
+        description: props['abstract']?.value ?? '',
+        tags: props['keywords']?.values ?? [],
+        content: props['articleBody']?.value ?? '',
+        iri: shapeData.iri,
+        shapeIRI: shapeData.shapeIRI,
+    };
+}
+
+/****************************************************************************************
+ * Node Type Registry
+ * 
+ * Maps target class IRIs to SvelteFlow node types.
+ * This is now derived from shapes but we maintain a mapping for custom node components.
+ */
+
+/**
+ * Map from target class local name to SvelteFlow node type
+ * Used to select which component renders the node
+ */
+const NODE_TYPE_MAP: Record<string, string> = {
+    'BlogPosting': 'blog',
+    // Future node types:
+    // 'Person': 'person',
+    // 'Project': 'project',
+};
+
+/**
+ * Get the SvelteFlow node type for a shape's target class
+ * Falls back to 'shape' for generic shape-based rendering
+ */
+function getNodeTypeForShape(shape: NodeShape): string {
+    return NODE_TYPE_MAP[shape.targetClassLocalName] ?? 'shape';
+}
+
+/****************************************************************************************
+ * Main Conversion Functions
+ */
+
+/**
+ * Convert RDF store contents to SvelteFlow nodes and edges
+ * Uses SHACL shapes to determine which resources to visualize and how
+ * 
+ * @param dataStore - Store containing instance data (data.ttl)
+ * @param shapeStore - Store containing SHACL shapes (shapes.ttl) - can be same as dataStore
+ */
+export function quadsToFlowElements(
+    dataStore: RdfStore, 
+    shapeStore?: RdfStore
+): { nodes: Node[]; edges: Edge[]; shapeRegistry: ShapeRegistry } {
+    // Use same store for shapes if not provided separately
+    const shapesStore = shapeStore ?? dataStore;
+    
+    // Build shape registry from loaded shapes
+    const shapeRegistry = buildShapeRegistry(shapesStore);
+    
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    
-    // Track which IRIs have been converted to nodes (for edge creation)
     const nodeIRIs = new Set<string>();
     
-    // First pass: create nodes for all visualizable resources
-    for (const [typeIRI, nodeType] of Object.entries(NODE_TYPE_REGISTRY)) {
-        const subjects = store.getResourcesByType(typeIRI);
+    // For each shape, find instances of its target class and create nodes
+    // 1st forward pass: NODES
+    for (const [targetClassIRI, shape] of shapeRegistry) {
+        const subjects = dataStore.getResourcesByType(targetClassIRI);
+        const nodeType = getNodeTypeForShape(shape);
+        
+        if (subjects.length > 0) {
+            console.log(`[FlowMapper] Found ${subjects.length} ${shape.targetClassLocalName} instance(s) → nodeType: "${nodeType}"`);
+        }
         
         for (const subject of subjects) {
-            const position = getPosition(store, subject);
+            const position = getPosition(dataStore, subject);
             
-            // Get node-specific data based on type
-            let data: BlogNodeData | { iri: string };
+            // Extract data based on shape
+            const shapeData = extractShapeData(dataStore, subject, shape);
             
-            switch (nodeType) {
-                case 'blog':
-                    data = blogPostingToNodeData(store, subject);
-                    break;
-                default:
-                    // Generic fallback: include IRI
-                    data = { iri: subject.value };
+            // Convert to specific node data format based on node type
+            let data: BlogNodeData | ShapeNodeData;
+            if (nodeType === 'blog') {
+                data = shapeDataToBlogData(shapeData);
+            } else {
+                data = shapeData;
             }
             
             nodes.push({
-                id: subject.value, // node id is the IRI of the resource
-                type: nodeType, // node type is determined w/ NODE_TYPE_REGISTRY
+                id: subject.value,
+                type: nodeType,
                 position,
-                data: data as Record<string, unknown>,
+                data: data as unknown as Record<string, unknown>,
             });
             
             nodeIRIs.add(subject.value);
         }
     }
     
-    // Second pass: create edges for object properties pointing to other nodes
-    // (e.g., schema:author pointing to a Person node)
-    // NOTE: Currently not yet utilized by the data, there also is no Person node type
+    // Create edges for object properties pointing to other visualized nodes
+    // 2nd forward pass: EDGES
     for (const nodeIRI of nodeIRIs) {
-        const quads = store.getQuads(namedNode(nodeIRI), null, null, null);
+        const quads = dataStore.getQuads(namedNode(nodeIRI), null, null, null);
         
         for (const quad of quads) {
-            // Only consider named node objects (not literals)
             if (quad.object.termType === 'NamedNode') {
                 const targetIRI = quad.object.value;
                 
-                // Only create edge if target is also a visualized node
-                // NOTE: only direct links are supported, also what if 
-                // - graph pattern we want to express is indirect & type dependent (e.g. tags used in a person's blog posts)
-                // - multiple predicates between two individual nodes
-                // - special edges (inverse, transitive, etc.)
-                // - edges treated as nodes (maybe too far fetched since we filter out non-UI visualizable resources)
                 if (nodeIRIs.has(targetIRI)) {
+                    const edgeLabel = getLocalName(quad.predicate.value);
                     edges.push({
                         id: `${nodeIRI}-${quad.predicate.value}-${targetIRI}`,
                         source: nodeIRI,
                         target: targetIRI,
-                        label: getPredicateLabel(quad.predicate.value),
+                        label: edgeLabel,
                     });
+                    console.log(`[FlowMapper] Edge: ${getLocalName(nodeIRI)} -[${edgeLabel}]-> ${getLocalName(targetIRI)}`);
                 }
             }
         }
     }
     
-    return { nodes, edges };
+    console.log(`[FlowMapper] ✓ Created ${nodes.length} nodes and ${edges.length} edges from ${shapeRegistry.size} shapes`);
+    
+    return { nodes, edges, shapeRegistry };
 }
-
-/**
- * Get a human-readable label for a predicate IRI
- * (used in quadsToFlowElements to set the edge label)
- */
-function getPredicateLabel(predicateIRI: string): string {
-    // Extract local name from IRI
-    // NOTE: is approach ignores that predicates can have labels themselves
-    // we should perhaps pass on the store to this function to get the label
-    const hashIndex = predicateIRI.lastIndexOf('#');
-    const slashIndex = predicateIRI.lastIndexOf('/');
-    const separatorIndex = Math.max(hashIndex, slashIndex);
-    
-    if (separatorIndex >= 0) {
-        return predicateIRI.substring(separatorIndex + 1);
-    }
-    
-    return predicateIRI;
-}
-
-/****************************************************************************************
- * Convert a SvelteFlow node back to RDF quads (for persistence)
- * NOTE: This is NOT being used in +page.svelte
- * Note: This is a simplified implementation for BlogPosting nodes
- * Ideally, this mapping should be inferred from SHACL somehow
- * Otherwise we will need both a blogPostingToNodeData & flowNodeToQuads function for each node type
- * Long term: would be nice to automatically build classes w/ methods from shacl in js or Pydantic maybe?
- */
-export function flowNodeToQuads(node: Node): { subject: string; predicates: Array<{ p: string; o: string }> } {
-    const data = node.data as unknown as BlogNodeData;
-    const subject = data.iri || node.id;
-    
-    const predicates: Array<{ p: string; o: string }> = [
-        { p: RDF.type.value, o: SCHEMA.BlogPosting.value },
-        { p: SCHEMA.headline.value, o: data.title },
-        { p: SCHEMA.abstract.value, o: data.description },
-        { p: SCHEMA.articleBody.value, o: data.content },
-        { p: RXYZ.x.value, o: String(node.position.x) },
-        { p: RXYZ.y.value, o: String(node.position.y) },
-    ];
-    
-    // Add tags as multiple keywords
-    for (const tag of data.tags) {
-        predicates.push({ p: SCHEMA.keywords.value, o: tag });
-    }
-    
-    return { subject, predicates };
-}
-
-/**
- * Shorten an IRI using known prefixes for display
- */
-export function shortenIRI(iri: string): string {
-    for (const [prefix, namespace] of Object.entries(PREFIXES)) {
-        if (iri.startsWith(namespace)) {
-            return `${prefix}:${iri.substring(namespace.length)}`;
-        }
-    }
-    return iri;
-}
-

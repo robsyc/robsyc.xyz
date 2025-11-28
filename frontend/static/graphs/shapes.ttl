@@ -96,3 +96,60 @@ rxyz:BlogNodeShapeArticleBody
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
     sh:message "Each blog post must include its articleBody string." .
+
+################################################################################
+# Person Node Shape
+# Allows schema:Person instances to be visualized in the flow UI
+################################################################################
+
+rxyz:PersonNodeShape
+    a sh:NodeShape ;
+    rdfs:label "Person node shape" ;
+    rdfs:comment "Visualizes Schema.org Person instances in the flow UI." ;
+    sh:targetClass schema:Person ;
+    sh:closed false ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property
+        rxyz:PersonNodeShapeGivenName ,
+        rxyz:PersonNodeShapeFamilyName ,
+        rxyz:PersonNodeShapeBirthDate ,
+        rxyz:PersonNodeShapeCoordsX ,
+        rxyz:PersonNodeShapeCoordsY .
+
+rxyz:PersonNodeShapeGivenName
+    a sh:PropertyShape ;
+    sh:path schema:givenName ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Person must have a given name." .
+
+rxyz:PersonNodeShapeFamilyName
+    a sh:PropertyShape ;
+    sh:path schema:familyName ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:message "Person may have a family name." .
+
+rxyz:PersonNodeShapeBirthDate
+    a sh:PropertyShape ;
+    sh:path schema:birthDate ;
+    sh:datatype xsd:date ;
+    sh:maxCount 1 ;
+    sh:message "Person may have a birth date." .
+
+rxyz:PersonNodeShapeCoordsX
+    a sh:PropertyShape ;
+    sh:path rxyz:x ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
+    sh:message "Person nodes must carry their x coordinate." .
+
+rxyz:PersonNodeShapeCoordsY
+    a sh:PropertyShape ;
+    sh:path rxyz:y ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
+    sh:message "Person nodes must carry their y coordinate." .

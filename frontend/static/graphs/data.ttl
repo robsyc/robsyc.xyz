@@ -25,6 +25,7 @@
 .
 
 rxyz:me a schema:Person ;
+    rxyz:x -350 ; rxyz:y 100 ;
     schema:givenName "Robbe" ;
     schema:familyName "Claeys" ;
     schema:birthDate "2000-04-03"^^xsd:date ;
@@ -50,4 +51,35 @@ The goal of this web application is three fold:
 3. To fuck around a bit; a playground for tinkering with shit that vaguely interest me.
 
 Expect unconventional UX, radical takes, and my occasional stab at zoomer-humor. I sincerely hope you enjoy lurking through my brain!""" ; 
+.
+
+rxyz:shaclDrivenUI a schema:BlogPosting ;
+    rxyz:x 450; rxyz:y 50 ;
+    schema:author rxyz:me ;
+    schema:headline "SHACL-Driven UI: From Shapes to Components" ;
+    schema:datePublished "2025-05-15T10:30:00"^^xsd:dateTime ;
+    schema:dateModified "2025-05-15T10:30:00"^^xsd:dateTime ;
+    schema:abstract "How SHACL shapes can drive dynamic UI generation in modern web applications" ;
+    schema:keywords "SHACL", "RDF", "Svelte", "Dynamic UI" ;
+    schema:articleBody """## The Problem with Hardcoded Mappings
+
+Traditional approaches to visualizing RDF data involve writing custom code for each entity type. This creates duplication: the shape definition lives in TTL, but the UI mapping lives in TypeScript.
+
+## Enter SHACL
+
+SHACL (Shapes Constraint Language) already describes:
+- What properties an entity should have
+- Their datatypes and cardinalities  
+- Validation constraints
+
+Why not use this same information to generate UI components?
+
+## The Solution
+
+By loading `shapes.ttl` into our RDF store and parsing the NodeShapes, we can:
+1. Dynamically discover which entity types have UI representations
+2. Extract property definitions for form generation
+3. Validate data before submission
+
+This is the foundation for truly **shape-driven** user interfaces.""" ;
 . 

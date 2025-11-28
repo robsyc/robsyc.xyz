@@ -1,6 +1,6 @@
 import { Store, Parser, Writer, DataFactory, Reasoner } from 'n3';
 import type { Quad, NamedNode, Term, Quad_Subject, Quad_Predicate, Quad_Object, Quad_Graph } from 'n3';
-import Validator from 'shacl-engine/Validator.js'
+import SHACLValidator from 'rdf-validate-shacl'
 import { RDF, PREFIXES } from '$lib/rdf/namespaces';
 
 // N3.DataFactory will give you the factory functions to create triples and quads
@@ -126,7 +126,9 @@ export class RdfStore {
     }
 
     /**
-     * Get all resources (subjects) of a given rdf:type
+     * Get all resources (subjects) of a given rdf:type 
+     *   - fetches resources where `?resource a typeIRI`
+     *   - e.g. `?resource a schema:BlogPosting`
      */
     getResourcesByType(typeIRI: string | NamedNode): NamedNode[] {
         const typeNode = typeof typeIRI === 'string' ? namedNode(typeIRI) : typeIRI;
