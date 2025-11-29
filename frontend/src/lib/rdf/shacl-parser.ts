@@ -28,16 +28,22 @@ import { getLocalName } from './utils';
 
 /****************************************************************************************
  * Parsed property shape with extracted constraints
- * A property shape is refferd to by a node shape via sh:property
- * It described the constraints on the relationship between 
- * the node shape's target and the property path e.g. its sh:path (URI of the predicate)
+ * - A property shape is refferd to by a node shape via sh:property
+ * - It described the constraints on the relationship between the NodeShape's focus node and the rachable node
+ * - sh:path is required, it specifies the relationship between the two nodes
  */
 export interface PropertyShape {
     iri: string;
     path: string;           // The predicate IRI this property constrains (required!)
-    // NOTE: will a simple string suffice to capture the path?
-    // In the future, we may interact with relevant but indirect attributes like
-    // :me :hasICE [ a :nameAttribute . :value "Robbe" ]
+    // NOTE: will a simple string suffice to capture the sh:path ?
+    // SHACL property paths are complex, they can be:
+    // - PredicatePath w/ simple IRI: :path ex:author
+    // - InversePath w/ reverse: :path [ sh:inversePath ex:childOf ]
+    // - SequencePath w/ nesting: :path ( ex:address ex:street )
+    // - AlternativePath w/ OR: :path [ sh:alternativePath ( ex:author ex:editor )]
+    // - ZeroOrMorePath: :path ( rdf:type [ sh:zeroOrMore rdfs:subClassOf ] )
+    // - OneOrMorePath: :path ( rdf:type [ sh:oneOrMore ex:knows ] )
+    // - ZeroOrOnePath: :path ( rdf:type [ sh:zeroOrOne ex:spouse ] )
     pathLocalName: string;  // Local name for display (e.g., "headline" from schema:headline) (see getLocalName)
     datatype?: string;      // XSD datatype if specified
     nodeKind?: string;      // sh:IRI, sh:BlankNode, sh:Literal, etc.
@@ -51,21 +57,112 @@ export interface PropertyShape {
     // - form builder(w/ json schema): https://www.shadcn-svelte.com/docs/components/form
     // shacl to json schema conversion https://github.com/comake/shacl-to-json-schema
     // or can we utilize these shadcn components + infuse shacl validation reports?
+    // might be better/easier to just use shadcn field along with rdf-validate-shacl for validation feedback, not the form component
 }
+
+// IMPORTANT NOTE: any shape, both NodeShape and PropertyShape, can have sh:property
+// In our current approach, PropertyShape doesn't itself cannot have properties, only constraints
+// To build more towards spec compliance, we should look into a parent Shape interface from which both NodeShape and PropertyShape inherit
+// Nice diagram here: https://www.w3.org/TR/shacl12-core/#constraints-section
+//
+// - SHACL defines two main kinds of shapes: NodeShape and PropertyShape. A shape is a “property shape” if (and only if) it has a sh:path. Other shapes (without sh:path) are node shapes.
+// - A PropertyShape may include nested property constraints on the value nodes reachable via that path — via the sh:property parameter.
+// - The value of sh:path is not always a simple IRI: it can be any “well-formed SHACL property path” (e.g. sequence, alternative, inverse, etc.)
+// - Non-validating shape characteristics: https://www.w3.org/TR/shacl12-core/#nonValidation
+// - Core constraints: https://www.w3.org/TR/shacl12-core/#core-components
 
 /**
  * Parsed node shape with target class and properties
- */
+*/
 export interface NodeShape {
     iri: string;
     label?: string;
     comment?: string;
     targetClass: string; // The rdf:type this shape targets (required!)
     targetClassLocalName: string; // this is now based off the URI, not the rdf:label of the target class (see getLocalName)
+    // NOTE: there are multiple ways to target a focus node for a shape
+    // sh:targetNode, sh:targetClass, sh:targetSubjectsOf, sh:targetObjectsOf, and implicitly when the NodeShape is also a rdfs:Class
     properties: PropertyShape[];
     closed: boolean;
     ignoredProperties: string[]; // NOTE: not yet implemented
 }
+
+// NOTE:
+// - the shacl 1.2 spec (stable but still in draft) document is well-structured and clear but some features are very complex (namely reification related)
+// - our implementation doesn't necessarily need to be fully compliant (we're building a **blog**), but our foundations should be solid for future compliance with 1.2
+// - we should document our code thoroughly to express where gaps exist and reference the spec where appropriate
+// - our JS interface should allow for: form generation, form population, form parsing, validation feedback, ...
+// - below is a crude draft of a more spec compliant interface; needs double-checking!
+//
+// Potential alternative interface (WIP):
+//
+// // First, a type for PropertyPath, not just a string
+// export type PropertyPath =
+//   | { type: 'Predicate'; iri: string }
+//   | { type: 'Inverse'; path: PropertyPath }
+//   | { type: 'Sequence'; items: PropertyPath[] }
+//   | { type: 'Alternative'; options: PropertyPath[] }
+//   | { type: 'ZeroOrOne'; path: PropertyPath }
+//   | { type: 'ZeroOrMore'; path: PropertyPath }
+//   | { type: 'OneOrMore'; path: PropertyPath };
+//
+// // Base interface for any Shape (node or property — or even nested shape)
+// export interface Shape {
+//     iri: string;             // optional IRI or blank-node identifier
+//
+//     // Validation characteristics (for validation reports)
+//     deactivated?: boolean;   // from sh:deactivated — allow disabling shapes
+//     message?: string;        // from sh:message — validation message
+//     severity?: string;       // from sh:severity — validation severity
+//
+//     // Non-validating shape characteristics (metadata)
+//     label?: string;          // from rdfs:label
+//     comment?: string;        // from rdfs:comment
+//     codeIdentifier?: string; // from sh:codeIdentifier — helpful for code generation
+//   }
+
+//   // Property-shape: constraints on values reachable via a path
+//   export interface PropertyShape extends Shape {
+//     path: PropertyPath;      // required: the SHACL property path
+//
+//     // Constraint parameters (https://www.w3.org/TR/shacl12-core/#core-components)
+//     // value type
+//     class?: string;          // sh:class constraint: required RDF type of value node(s)
+//     datatype?: string;       // e.g. xsd:string, etc.
+//     nodeKind?: sh:NodeKind: sh:BlankNode, sh:IRI, sh:Literal sh:BlankNodeOrIRI, sh:BlankNodeOrLiteral, sh:IRIOrLiteral, and sh:TripleTerm.
+//     // cardinality
+//     minCount?: number;
+//     maxCount?: number;
+//     // value range: sh:minExclusive, sh:minInclusive, sh:maxExclusive, sh:maxInclusive
+//     // string-based: sh:minLength, sh:maxLength, sh:pattern, sh:singleLine, sh:languageIn, sh:uniqueLang
+//     // list-based: sh:memberShape, sh:minListLength, sh:maxListLength, sh:uniqueMembers
+//     // property-pair: sh:equals, sh:disjoint, sh:lessThan, sh:lessThanOrEquals
+//     // logical: sh:or, sh:and, sh:not, sh:xone
+//     // shape-based: sh:node, sh:property, sh:someValue, sh:qualifiedValueShape, sh:qualifiedMinCount, sh:qualifiedMaxCount, ...
+//     // others: sh:closed, sh:ignoredProperties, sh:in, sh:hasValue
+//     
+//     // Non-validating shape characteristics (metadata)
+//     name?: string;           // from sh:name
+//     description?: string;    // from sh:description (or rdfs:comment / rdf:label for node-shape)
+//     order?: number;          // from sh:order — UI ordering
+//     group?: string;          // optional grouping key (from sh:group)
+//     defaultValue?: any;      // from sh:defaultValue — for pre-populating forms
+//     values?: any;            
+//   }
+  
+//   // Node-shape: constraints on focus nodes (instances)
+//   export interface NodeShape extends Shape {
+//     targetClass?: string;     // sh:targetClass
+//     targetNode?: string;      // sh:targetNode (for specific individuals)
+//     targetSubjectsOf?: string;  // sh:targetSubjectsOf — apply shape to all subjects using this predicate
+//     targetObjectsOf?: string;   // sh:targetObjectsOf — apply to all objects
+//     properties: PropertyShape[];
+//     closed?: boolean;         // sh:closed
+//     ignoredProperties?: string[];  // sh:ignoredProperties
+//     // Additional constraint combos: or / and / not / qualifiedValueShapes etc. could also go here
+//   }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Parse a single PropertyShape from the store

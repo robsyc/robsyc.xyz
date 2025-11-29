@@ -99,7 +99,7 @@
     >
         <Controls />
         <Background 
-            bgColor="var(--background)"
+            bgColor="var(--accent)"
             variant={BackgroundVariant.Dots} 
         />
         <!-- MiniMap -->

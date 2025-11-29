@@ -30,43 +30,55 @@ It a website with a blog!
 - [x] SHACL-driven flow mapping (shapes.ttl → SvelteFlow nodes)
 - [x] Generic `ShapeNode` component for shape-based rendering
 - [x] PersonNodeShape for testing generic rendering
+- [ ] Improve Node components
+    - [ ] Simplify with shadcn Item (instead of Card)
+    - [ ] ShapeNode w/ better hints and scrutinize w/ difficult shacl shapes
+    - [ ] Custom edge and edge anchors
+- [ ] Remove redundant/unused code; resolve NOTE's and TODO's
+- [ ] Shape-aware RDF triples view (use shape to construct queries and populate Dialog)
+- [ ] Turtle/N-Triples serialization in dialogs
+- [ ] Revise shacl-parser.ts to be more spec compliant: generic parent Shape interface, property paths, etc.
+
+#### Return to the use-case!
+- [ ] Introduce schema:Blog that links to schema:BlogPosting in data.ttl
+- [ ] Visualize the blog as a node with an action (loaded on mount) to view the blog posts as a list (request made to the backend)
+- [ ] Thats the first node-based storytelling use-case! A user on /app is met with a canvas with on it a node (a kind of panel or base interface for new users) with a button that, when clicked, requests the blog posts (also nodes on the canvas) and adds them to the canvas.
 
 ### Phase 2: Data Loading & Backend Integration
-- [ ] Load triples from URL/endpoint (edit route)
+- [ ] No more triples loaded from the frontend /static, but dynamically loaded from the backend
+- [ ] Load triples from URL/endpoint
 - [ ] FastAPI to SvelteKit API gateway
   - [ ] SPARQL query endpoint integration
-  - [ ] Semantic search (Meilisearch integration)
-  - [ ] SHACL validation/inference endpoint
+  - [ ] Request shapes
+  - [ ] SHACL validation/inference endpoints
   - [ ] Triple update/mutation endpoints
+  - [ ] Content negotiation
 - [ ] Real-time triple streaming (WebSocket/SSE)
-- [ ] Content negotiation (RDFa, JSON-LD injection)
-- [ ] No more triples loaded from the frontend /static, but dynamically loaded from the backend
-- [ ] Workflow that fetches "materialized" KG and publishes to /static, pointing content negotiation to the statis files
 
 ### Phase 3: SHACL-Driven Forms & Editing
-- [ ] Edit route UI (`/app/edit`)
 - [ ] SHACL to Shadcn form builder
-  - [ ] Property shape → form field mapping
-  - [ ] DASH UI hints integration
-  - [ ] Validation feedback from SHACL reports
+  - [ ] Property shape → form field mapping (shadcn Field components)
+  - [ ] DASH UI hints integration (PropertyShape to Item/Field conversion)
+  - [ ] Validation feedback from SHACL reports ('rdf-validate-shacl') client-side!
 - [ ] Form submission → triple generation
   - [ ] Shape-driven serialization (reverse of extraction)
-  - [ ] Update RDF store on submit
+  - [ ] Update RDF store on submit (through backend, which enriches it with e.g. PROV)
   - [ ] Backend persistence via SPARQL UPDATE
 
-### Phase 4: Enhanced Visualization
-- [ ] Shape-aware RDF triples view (use shape to construct queries)
+### Phase 4: Enhanced Visualization & Features
 - [ ] Multi-hop relationship visualization
-- [ ] Turtle/N-Triples serialization in dialogs
-- [ ] Shape hierarchy (BaseNode → BlogNode/PersonNode)
-- [ ] RDFa and JSON-LD semantic markup for SEO, infused w/ inferenced classes
+- [ ] Node component hierarchy (BaseNode → BlogNode/PersonNode)
+- [ ] OWL inferred classes, management for more complex data
+- [ ] RDFa and JSON-LD semantic markup for SEO
+- [ ] robsyc agent and avatar in UI (makes toast!)
 
 ### Phase 5: Advanced Features
+- [ ] GitHub workflow to fetches "materialized" KG and publishes to /static w/ content negotiation
+- [ ] Semantic search (Meilisearch integration)
 - [ ] Proper ontology/KG construction
-  - [ ] OWL inference visualization
+  - [ ] N3.js / eye-js inference w/ OWL and visualization
   - [ ] Class hierarchy display
   - [ ] Property chain visualization
-- [ ] robsyc agent and avatar in UI (makes toast!)
 - [ ] Auth and user functionality (comments, likes, bookmarks)
 - [ ] Collaborative spaces (Yjs for real-time editing)
 - [ ] Node builder for creating SHACL shapes visually
