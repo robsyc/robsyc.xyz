@@ -1,5 +1,5 @@
 import { Store, Parser, Writer, DataFactory, Reasoner } from 'n3';
-import type { Quad, NamedNode, Term, Quad_Subject, Quad_Predicate, Quad_Object, Quad_Graph } from 'n3';
+import type { Quad, NamedNode, BlankNode, Term, Quad_Subject, Quad_Predicate, Quad_Object, Quad_Graph } from 'n3';
 import SHACLValidator from 'rdf-validate-shacl'
 import { RDF, PREFIXES } from '$lib/rdf/namespaces';
 
@@ -129,20 +129,22 @@ export class RdfStore {
      * Get all resources (subjects) of a given rdf:type 
      *   - fetches resources where `?resource a typeIRI`
      *   - e.g. `?resource a schema:BlogPosting`
+     *   - includes both NamedNode and BlankNode subjects
      */
-    getResourcesByType(typeIRI: string | NamedNode): NamedNode[] {
+    getResourcesByType(typeIRI: string | NamedNode): (NamedNode | BlankNode)[] {
         const typeNode = typeof typeIRI === 'string' ? namedNode(typeIRI) : typeIRI;
         const quads = this.#store.getQuads(null, RDF.type, typeNode, null);
         
-        // Return unique subjects as NamedNodes
+        // Return unique subjects (NamedNodes and BlankNodes)
         const subjects = new Set<string>();
-        const result: NamedNode[] = [];
+        const result: (NamedNode | BlankNode)[] = [];
         
         for (const q of quads) {
             const subjectValue = q.subject.value;
-            if (!subjects.has(subjectValue) && q.subject.termType === 'NamedNode') {
+            if (!subjects.has(subjectValue) && 
+                (q.subject.termType === 'NamedNode' || q.subject.termType === 'BlankNode')) {
                 subjects.add(subjectValue);
-                result.push(q.subject as NamedNode);
+                result.push(q.subject as NamedNode | BlankNode);
             }
         }
         

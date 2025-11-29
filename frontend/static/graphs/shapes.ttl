@@ -114,11 +114,19 @@ rxyz:Person
     sh:targetClass schema:Person ;
     sh:closed false ;
     sh:property
+        rxyz:PersonComment ,
         rxyz:PersonGivenName ,
         rxyz:PersonFamilyName ,
         rxyz:PersonBirthDate ,
         rxyz:PersonCoordsX ,
         rxyz:PersonCoordsY .
+
+rxyz:PersonComment
+    a sh:PropertyShape ;
+    sh:path rdfs:comment ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:message "Person at most one comment." .
 
 rxyz:PersonGivenName
     a sh:PropertyShape ;
@@ -186,5 +194,17 @@ rxyz:Blog a sh:NodeShape ;
         sh:maxCount 1 ;
         sh:datatype xsd:string ;
         sh:message "Blogs must have a description." ;
+    ] , [
+        sh:path rxyz:x ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Blog nodes must carry their x coordinate." ;
+    ] , [
+        sh:path rxyz:y ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Blog nodes must carry their y coordinate." ;
     ] ;
 .

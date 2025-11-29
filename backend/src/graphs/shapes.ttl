@@ -7,25 +7,30 @@
 @prefix schema: <https://schema.org/> .
 @prefix rxyz: <http://rosyc.xyz#> .
 
-rxyz:BlogNodeShape
+
+################################################################################
+# BlogPosting Node Shape
+# Allows schema:BlogPosting instances to be visualized in the flow UI
+################################################################################
+
+rxyz:BlogPosting
     a sh:NodeShape ;
-    rdfs:label "Blog node shape" ;
-    rdfs:comment "Validates Schema.org BlogPosting instances used in the flow UI." ;
+    rdfs:label "BlogPosting" ;
+    rdfs:comment "Node shape for schema:BlogPosting instances." ;
     sh:targetClass schema:BlogPosting ;
     sh:closed false ;
-    sh:ignoredProperties ( rdf:type ) ;
     sh:property
-        rxyz:BlogNodeShapeHeadline ,
-        rxyz:BlogNodeShapeAuthor ,
-        rxyz:BlogNodeShapeCoordsX ,
-        rxyz:BlogNodeShapeCoordsY ,
-        rxyz:BlogNodeShapeDatePublished ,
-        rxyz:BlogNodeShapeDateModified ,
-        rxyz:BlogNodeShapeAbstract ,
-        rxyz:BlogNodeShapeKeywords ,
-        rxyz:BlogNodeShapeArticleBody .
+        rxyz:BlogPostingHeadline ,
+        rxyz:BlogPostingAuthor ,
+        rxyz:BlogPostingCoordsX ,
+        rxyz:BlogPostingCoordsY ,
+        rxyz:BlogPostingDatePublished ,
+        rxyz:BlogPostingDateModified ,
+        rxyz:BlogPostingAbstract ,
+        rxyz:BlogPostingKeywords ,
+        rxyz:BlogPostingArticleBody .
 
-rxyz:BlogNodeShapeHeadline
+rxyz:BlogPostingHeadline
     a sh:PropertyShape ;
     sh:path schema:headline ;
     sh:datatype xsd:string ;
@@ -33,7 +38,7 @@ rxyz:BlogNodeShapeHeadline
     sh:maxCount 1 ;
     sh:message "Blog posts must have a single headline." .
 
-rxyz:BlogNodeShapeAuthor
+rxyz:BlogPostingAuthor
     a sh:PropertyShape ;
     sh:path schema:author ;
     sh:minCount 1 ;
@@ -42,7 +47,7 @@ rxyz:BlogNodeShapeAuthor
     sh:class schema:Person ;
     sh:message "Author must reference a schema:Person." .
 
-rxyz:BlogNodeShapeCoordsX
+rxyz:BlogPostingCoordsX
     a sh:PropertyShape ;
     sh:path rxyz:x ;
     sh:minCount 1 ;
@@ -50,7 +55,7 @@ rxyz:BlogNodeShapeCoordsX
     sh:datatype xsd:integer ;
     sh:message "Blog nodes must carry their x coordinate as an integer." .
 
-rxyz:BlogNodeShapeCoordsY
+rxyz:BlogPostingCoordsY
     a sh:PropertyShape ;
     sh:path rxyz:y ;
     sh:minCount 1 ;
@@ -58,7 +63,7 @@ rxyz:BlogNodeShapeCoordsY
     sh:datatype xsd:integer ;
     sh:message "Blog nodes must carry their y coordinate as an integer." .
 
-rxyz:BlogNodeShapeDatePublished
+rxyz:BlogPostingDatePublished
     a sh:PropertyShape ;
     sh:path schema:datePublished ;
     sh:minCount 1 ;
@@ -66,7 +71,7 @@ rxyz:BlogNodeShapeDatePublished
     sh:datatype xsd:dateTime ;
     sh:message "Each blog post needs datePublished (xsd:dateTime)." .
 
-rxyz:BlogNodeShapeDateModified
+rxyz:BlogPostingDateModified
     a sh:PropertyShape ;
     sh:path schema:dateModified ;
     sh:minCount 1 ;
@@ -74,7 +79,7 @@ rxyz:BlogNodeShapeDateModified
     sh:datatype xsd:dateTime ;
     sh:message "Each blog post needs dateModified (xsd:dateTime)." .
 
-rxyz:BlogNodeShapeAbstract
+rxyz:BlogPostingAbstract
     a sh:PropertyShape ;
     sh:path schema:abstract ;
     sh:minCount 1 ;
@@ -82,17 +87,124 @@ rxyz:BlogNodeShapeAbstract
     sh:datatype xsd:string ;
     sh:message "Blog posts require a single abstract/description." .
 
-rxyz:BlogNodeShapeKeywords
+rxyz:BlogPostingKeywords
     a sh:PropertyShape ;
     sh:path schema:keywords ;
     sh:datatype xsd:string ;
     sh:minCount 1 ;
     sh:message "Provide at least one keyword string per blog post." .
 
-rxyz:BlogNodeShapeArticleBody
+rxyz:BlogPostingArticleBody
     a sh:PropertyShape ;
     sh:path schema:articleBody ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
     sh:message "Each blog post must include its articleBody string." .
+
+################################################################################
+# Person Node Shape
+# Allows schema:Person instances to be visualized in the flow UI
+################################################################################
+
+rxyz:Person
+    a sh:NodeShape ;
+    rdfs:label "Person" ;
+    rdfs:comment "Node shape for schema:Person instances." ;
+    sh:targetClass schema:Person ;
+    sh:closed false ;
+    sh:property
+        rxyz:PersonComment ,
+        rxyz:PersonGivenName ,
+        rxyz:PersonFamilyName ,
+        rxyz:PersonBirthDate ,
+        rxyz:PersonCoordsX ,
+        rxyz:PersonCoordsY .
+
+rxyz:PersonComment
+    a sh:PropertyShape ;
+    sh:path rdfs:comment ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:message "Person at most one comment." .
+
+rxyz:PersonGivenName
+    a sh:PropertyShape ;
+    sh:path schema:givenName ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Person must have a given name." .
+
+rxyz:PersonFamilyName
+    a sh:PropertyShape ;
+    sh:path schema:familyName ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:message "Person may have a family name." .
+
+rxyz:PersonBirthDate
+    a sh:PropertyShape ;
+    sh:path schema:birthDate ;
+    sh:datatype xsd:date ;
+    sh:maxCount 1 ;
+    sh:message "Person may have a birth date." .
+
+rxyz:PersonCoordsX
+    a sh:PropertyShape ;
+    sh:path rxyz:x ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
+    sh:message "Person nodes must carry their x coordinate." .
+
+rxyz:PersonCoordsY
+    a sh:PropertyShape ;
+    sh:path rxyz:y ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
+    sh:message "Person nodes must carry their y coordinate." .
+
+################################################################################
+# Blog Node Shape
+# Allows schema:Blog instances to be visualized in the flow UI
+################################################################################
+
+rxyz:Blog a sh:NodeShape ;
+    rdfs:label "Blog" ;
+    rdfs:comment "Node shape for schema:Blog instances." ;
+    sh:targetClass schema:Blog ;
+    sh:closed false ;
+    sh:property [
+        sh:path schema:blogPost ;
+        sh:class schema:BlogPosting ;
+        sh:minCount 1 ;
+        sh:nodeKind sh:IRI ;
+        sh:message "Blogs must reference a schema:BlogPosting." ;
+    ] , [
+        sh:path schema:name ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Blogs must have a name." ;
+    ] , [
+        sh:path schema:description ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Blogs must have a description." ;
+    ] , [
+        sh:path rxyz:x ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Blog nodes must carry their x coordinate." ;
+    ] , [
+        sh:path rxyz:y ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Blog nodes must carry their y coordinate." ;
+    ] ;
+.

@@ -21,10 +21,13 @@
  *           sh:path identifies the path
  */
 
-import type { NamedNode } from 'n3';
+import type { NamedNode, BlankNode, Term } from 'n3';
 import type { RdfStore } from '$lib/stores/rdf.svelte';
 import { RDFS, SH, PREFIXES } from './namespaces';
 import { getLocalName } from './utils';
+
+/** Type alias for subjects that can be either named or blank nodes */
+type SubjectNode = NamedNode | BlankNode;
 
 /****************************************************************************************
  * Parsed property shape with extracted constraints
@@ -166,23 +169,24 @@ export interface NodeShape {
 
 /**
  * Parse a single PropertyShape from the store
+ * Accepts both NamedNode (external reference) and BlankNode (inline definition)
  */
-function parsePropertyShape(store: RdfStore, shapeIRI: NamedNode): PropertyShape | null {
-    const path = store.getValue(shapeIRI, SH.path);
+function parsePropertyShape(store: RdfStore, shapeNode: SubjectNode): PropertyShape | null {
+    const path = store.getValue(shapeNode, SH.path);
     if (!path) {
-        console.warn(`[SHACL] PropertyShape ${shapeIRI.value} has no sh:path`);
+        console.warn(`[SHACL] PropertyShape ${shapeNode.value} has no sh:path`);
         return null;
     }
 
-    const datatype = store.getValue(shapeIRI, SH.datatype);
-    const nodeKind = store.getValue(shapeIRI, SH.nodeKind);
-    const shClass = store.getValue(shapeIRI, SH.class);
-    const minCount = store.getValue(shapeIRI, SH.minCount);
-    const maxCount = store.getValue(shapeIRI, SH.maxCount);
-    const message = store.getValue(shapeIRI, SH.message);
+    const datatype = store.getValue(shapeNode, SH.datatype);
+    const nodeKind = store.getValue(shapeNode, SH.nodeKind);
+    const shClass = store.getValue(shapeNode, SH.class);
+    const minCount = store.getValue(shapeNode, SH.minCount);
+    const maxCount = store.getValue(shapeNode, SH.maxCount);
+    const message = store.getValue(shapeNode, SH.message);
 
     return {
-        iri: shapeIRI.value,
+        iri: shapeNode.value,
         path: path.value,
         pathLocalName: getLocalName(path.value),
         datatype: datatype?.value,
@@ -196,26 +200,28 @@ function parsePropertyShape(store: RdfStore, shapeIRI: NamedNode): PropertyShape
 
 /**
  * Parse a NodeShape and its property shapes from the store
+ * Accepts both NamedNode and BlankNode for the shape itself
  */
-function parseNodeShape(store: RdfStore, shapeIRI: NamedNode): NodeShape | null {
-    const targetClass = store.getValue(shapeIRI, SH.targetClass);
+function parseNodeShape(store: RdfStore, shapeNode: SubjectNode): NodeShape | null {
+    const targetClass = store.getValue(shapeNode, SH.targetClass);
     if (!targetClass) {
-        console.warn(`[SHACL] NodeShape ${shapeIRI.value} has no sh:targetClass`);
+        console.warn(`[SHACL] NodeShape ${shapeNode.value} has no sh:targetClass`);
         return null;
     }
 
     // Get metadata
-    const label = store.getValue(shapeIRI, RDFS.label);
-    const comment = store.getValue(shapeIRI, RDFS.comment);
-    const closed = store.getValue(shapeIRI, SH.closed);
+    const label = store.getValue(shapeNode, RDFS.label);
+    const comment = store.getValue(shapeNode, RDFS.comment);
+    const closed = store.getValue(shapeNode, SH.closed);
 
-    // Get property shapes
-    const propertyRefs = store.getValues(shapeIRI, SH.property);
+    // Get property shapes (can be NamedNode references or inline BlankNode definitions)
+    const propertyRefs = store.getValues(shapeNode, SH.property);
     const properties: PropertyShape[] = [];
 
     for (const propRef of propertyRefs) {
-        if (propRef.termType === 'NamedNode') {
-            const propShape = parsePropertyShape(store, propRef as NamedNode);
+        // Handle both NamedNode (external reference) and BlankNode (inline definition)
+        if (propRef.termType === 'NamedNode' || propRef.termType === 'BlankNode') {
+            const propShape = parsePropertyShape(store, propRef as SubjectNode);
             if (propShape) {
                 properties.push(propShape);
             }
@@ -229,7 +235,7 @@ function parseNodeShape(store: RdfStore, shapeIRI: NamedNode): NodeShape | null 
     const ignoredProperties: string[] = [];
 
     return {
-        iri: shapeIRI.value,
+        iri: shapeNode.value,
         label: label?.value,
         comment: comment?.value,
         targetClass: targetClass.value,
@@ -252,12 +258,12 @@ export type ShapeRegistry = Map<string, NodeShape>;
 export function buildShapeRegistry(store: RdfStore): ShapeRegistry {
     const registry: ShapeRegistry = new Map();
     
-    // Find all sh:NodeShape instances
+    // Find all sh:NodeShape instances (can be NamedNodes or BlankNodes)
     const nodeShapes = store.getResourcesByType(SH.NodeShape);
     console.log(`[SHACL] Found ${nodeShapes.length} NodeShape(s) in store`);
     
-    for (const shapeIRI of nodeShapes) {
-        const shape = parseNodeShape(store, shapeIRI);
+    for (const shapeNode of nodeShapes) {
+        const shape = parseNodeShape(store, shapeNode);
         if (shape) {
             registry.set(shape.targetClass, shape);
             const propNames = shape.properties.map(p => p.pathLocalName).join(', ');

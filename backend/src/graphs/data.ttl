@@ -1,30 +1,13 @@
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix schema: <https://schema.org/> .
-@prefix vann: <http://purl.org/vocab/vann/> .
-@prefix dc: <http://purl.org/dc/terms/> .
-
-# These are not used, but we should create an ontology to materialize all these equivalences
-# @prefix foaf: <http://xmlns.com/foaf/0.1/> .
-# @prefix sioc: <http://rdfs.org/sioc/ns#> .
-# @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
-# @prefix cito: <http://purl.org/spar/cito/> .
-# @prefix prov: <http://www.w3.org/ns/prov#> .
-
 @prefix rxyz: <http://rosyc.xyz#> .
-@base <http://rosyc.xyz#> .
 
-<http://rosyc.xyz#> a owl:Ontology ;
-    dc:description "robsyc's personal knowledge graph"@en ;
-    dc:title "robsyc KG"@en ;
-    vann:preferredNamespacePrefix "rxyz" ;
-    vann:preferredNamespaceUri "http://rosyc.xyz#" ;
-.
 
 rxyz:me a schema:Person ;
+    rxyz:x 800 ; rxyz:y 450 ;
     schema:givenName "Robbe" ;
     schema:familyName "Claeys" ;
     schema:birthDate "2000-04-03"^^xsd:date ;
@@ -32,10 +15,18 @@ rxyz:me a schema:Person ;
         a schema:Place ;
         schema:name "Ghent, Belgium" ;
     ] ;
+    # rdfs:comment "Hahahaha this is me! I'm a person." ;
+.
+
+rxyz:MyBlog a schema:Blog ;
+    rxyz:x -300; rxyz:y -150 ;
+    schema:name "My Blog" ;
+    schema:description "This is my blog, where I write about my thoughts, opinions and beliefs." ;
+    schema:blogPost rxyz:firstBlogPost, rxyz:shaclDrivenUI ;
 .
 
 rxyz:firstBlogPost a schema:BlogPosting ;
-    rxyz:x 0; rxyz:y 0 ;
+    rxyz:x 0; rxyz:y 500 ;
     schema:author rxyz:me ;
     schema:headline "What am I looking at?" ;
     schema:datePublished "2025-01-01T00:00:00"^^xsd:dateTime ;
@@ -50,4 +41,35 @@ The goal of this web application is three fold:
 3. To fuck around a bit; a playground for tinkering with shit that vaguely interest me.
 
 Expect unconventional UX, radical takes, and my occasional stab at zoomer-humor. I sincerely hope you enjoy lurking through my brain!""" ; 
+.
+
+rxyz:shaclDrivenUI a schema:BlogPosting ;
+    rxyz:x 450; rxyz:y 50 ;
+    schema:author rxyz:me ;
+    schema:headline "SHACL-Driven UI: From Shapes to Components" ;
+    schema:datePublished "2025-05-15T10:30:00"^^xsd:dateTime ;
+    schema:dateModified "2025-05-15T10:30:00"^^xsd:dateTime ;
+    schema:abstract "How SHACL shapes can drive dynamic UI generation in modern web applications" ;
+    schema:keywords "SHACL", "RDF", "Svelte", "Dynamic UI" ;
+    schema:articleBody """## The Problem with Hardcoded Mappings
+
+Traditional approaches to visualizing RDF data involve writing custom code for each entity type. This creates duplication: the shape definition lives in TTL, but the UI mapping lives in TypeScript.
+
+## Enter SHACL
+
+SHACL (Shapes Constraint Language) already describes:
+- What properties an entity should have
+- Their datatypes and cardinalities  
+- Validation constraints
+
+Why not use this same information to generate UI components?
+
+## The Solution
+
+By loading `shapes.ttl` into our RDF store and parsing the NodeShapes, we can:
+1. Dynamically discover which entity types have UI representations
+2. Extract property definitions for form generation
+3. Validate data before submission
+
+This is the foundation for truly **shape-driven** user interfaces.""" ;
 . 

@@ -9,7 +9,6 @@
         // MiniMap,
     } from '@xyflow/svelte';
     import type { Node, Edge } from '@xyflow/svelte';
-    // import { initialNodes, initialEdges } from '$lib/flow-data';
 
     // RDF store and mapper
     import { rdfStore } from '$lib/stores/rdf.svelte';
@@ -19,12 +18,14 @@
     // Import our custom node types and other components
     import BlogNode from '$lib/components/flow/BlogNode.svelte';
     import ShapeNode from '$lib/components/flow/ShapeNode.svelte';
+    import NavigationNode from '$lib/components/flow/NavigationNode.svelte';
     import { Spinner } from "$lib/components/ui/spinner/index.js";
     
-    // Register node types - 'blog' for BlogPosting, 'shape' as generic fallback
+    // Register node types - 'shape' as generic fallback
     const nodeTypes = {
-        blog: BlogNode,
         shape: ShapeNode,
+        blog: BlogNode,
+        navigation: NavigationNode,
     };
    
     // Loading state
@@ -32,7 +33,7 @@
     let loadingMessage = $state('Initializing...');
     let error = $state<string | null>(null);
     
-    // Shape registry for debugging/inspection
+    // Shape registry for on-demand node creation
     let shapeRegistry = $state<ShapeRegistry | null>(null);
     
     // Using $state.raw for the nodes and edges so Svelte Flow can update their positions
@@ -47,26 +48,87 @@
         return 'system';
     });
     
-    // Load RDF data on mount
-    // Question: is this pre-rendered by SvelteKit?
-    // What are alternatives and how do those behave? e.g. click to load, lazy, ...
-    // TODO: we should not just add triples onMount, but also have a way to load from link/action
+    /**
+     * Map from part IRI to the graph file that should be loaded
+     * For now, this is a simple mapping; in the future, this could be
+     * fetched from the backend or derived from the RDF data itself
+     */
+    const PART_TO_GRAPH: Record<string, string> = {
+        'http://rosyc.xyz#MyBlog': '/graphs/data.ttl',
+    };
+    
+    /**
+     * Load additional graph content dynamically
+     * Called when user clicks a hasPart button in NavigationNode
+     */
+    async function loadGraph(partIRI: string) {
+        const graphUrl = PART_TO_GRAPH[partIRI];
+        if (!graphUrl) {
+            console.warn(`[App] No graph mapping found for: ${partIRI}`);
+            return;
+        }
+        
+        console.log(`[App] Loading graph for ${partIRI}: ${graphUrl}`);
+        isLoading = true;
+        loadingMessage = 'Loading additional content...';
+        
+        try {
+            // Load shapes first if not already loaded
+            await rdfStore.loadFromUrl('/graphs/shapes.ttl');
+            
+            // Load the requested graph data
+            await rdfStore.loadFromUrl(graphUrl);
+            
+            // Rebuild flow elements with all loaded data
+            const elements = quadsToFlowElements(rdfStore);
+            
+            // Re-inject callbacks for navigation nodes after rebuilding
+            nodes = injectCallbacks(elements.nodes);
+            edges = elements.edges;
+            shapeRegistry = elements.shapeRegistry;
+            
+            console.log(`[App] Graph loaded. Now have ${nodes.length} nodes and ${edges.length} edges`);
+        } catch (e) {
+            error = e instanceof Error ? e.message : 'Failed to load additional content';
+            console.error('[App] Error loading graph:', e);
+        } finally {
+            isLoading = false;
+        }
+    }
+    
+    /**
+     * Inject the loadGraph callback into navigation node data
+     * This allows NavigationNode to trigger dynamic loading
+     */
+    function injectCallbacks(nodeList: Node[]): Node[] {
+        return nodeList.map(node => {
+            if (node.type === 'navigation') {
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        onLoadPart: loadGraph,
+                    },
+                };
+            }
+            return node;
+        });
+    }
+    
+    // Load initial home.ttl on mount
     onMount(async () => {
         try {
-            // Step 1: Load SHACL shapes first (defines what we can visualize)
-            loadingMessage = 'Loading shape definitions...';
-            await rdfStore.loadFromUrl('/graphs/shapes.ttl');
-            console.log('[App] Loaded shapes.ttl');
+            // Load home.ttl which contains the navigation element and its shape
+            loadingMessage = 'Loading home...';
+            await rdfStore.loadFromUrl('/graphs/home.ttl');
+            console.log('[App] Loaded home.ttl');
             
-            // Step 2: Load instance data
-            loadingMessage = 'Loading knowledge graph data...';
-            await rdfStore.loadFromUrl('/graphs/data.ttl');
-            console.log('[App] Loaded data.ttl');
-            
-            // Step 3: Convert RDF to SvelteFlow elements using shape-driven mapping
+            // Convert RDF to SvelteFlow elements using shape-driven mapping
             loadingMessage = 'Building visualization...';
             const elements = quadsToFlowElements(rdfStore);
-            nodes = elements.nodes;
+            
+            // Inject callbacks for navigation nodes
+            nodes = injectCallbacks(elements.nodes);
             edges = elements.edges;
             shapeRegistry = elements.shapeRegistry;
             
@@ -82,7 +144,7 @@
     
     // Event handlers
     function handleNodeClick(event: { node: Node }) {
-        console.log('Node clicked:', event.node.id, event.node.type);
+        console.log('Node clicked:', event.node.id, event.node.type, event.node.position);
     }
 </script>
 
@@ -105,16 +167,15 @@
         <!-- MiniMap -->
     </SvelteFlow>
     
-    <!-- TODO: rather than complete screen overlay, we should show the canvas without nodes, with first nodes, edge, more nodes, ... lazy loading -->
     <!-- Loading overlay -->
-    {#if isLoading}
-        <div class="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <!-- {#if isLoading}
+        <div class="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div class="flex flex-col items-center gap-3">
                 <Spinner class="size-8" />
                 <p class="text-muted-foreground text-sm">{loadingMessage}</p>
             </div>
         </div>
-    {/if}
+    {/if} -->
     
     <!-- Error overlay -->
     {#if error}

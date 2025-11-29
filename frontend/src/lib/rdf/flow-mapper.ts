@@ -7,7 +7,7 @@
 
 import type { Node, Edge } from '@xyflow/svelte';
 import { DataFactory } from 'n3';
-import type { NamedNode } from 'n3';
+import type { NamedNode, BlankNode } from 'n3';
 import type { RdfStore } from '$lib/stores/rdf.svelte';
 import { RXYZ, RDFS } from './namespaces';
 import { 
@@ -24,6 +24,9 @@ import {
 } from './utils';
 
 const { namedNode } = DataFactory;
+
+/** Type alias for subjects that can be either named or blank nodes */
+type SubjectNode = NamedNode | BlankNode;
 
 /****************************************************************************************
  * Node Data Interfaces
@@ -80,8 +83,9 @@ export interface BlogNodeData {
 
 /**
  * Get position from rxyz:x and rxyz:y predicates
+ * Accepts both NamedNode and BlankNode subjects
  */
-function getPosition(store: RdfStore, subject: NamedNode): { x: number; y: number } {
+function getPosition(store: RdfStore, subject: SubjectNode): { x: number; y: number } {
     return {
         x: termToNumber(store.getValue(subject, RXYZ.x), 0),
         y: termToNumber(store.getValue(subject, RXYZ.y), 0),
@@ -94,10 +98,11 @@ function getPosition(store: RdfStore, subject: NamedNode): { x: number; y: numbe
 
 /**
  * Extract a PropertyValue from the store based on a PropertyShape
+ * Accepts both NamedNode and BlankNode subjects
  */
 function extractPropertyValue(
     store: RdfStore, 
-    subject: NamedNode, 
+    subject: SubjectNode, 
     propShape: PropertyShape
 ): PropertyValue {
     const pathNode = namedNode(propShape.path);
@@ -117,10 +122,11 @@ function extractPropertyValue(
 
 /**
  * Extract all property values for a resource based on its shape
+ * Accepts both NamedNode and BlankNode subjects
  */
 function extractShapeData(
     store: RdfStore, 
-    subject: NamedNode, 
+    subject: SubjectNode, 
     shape: NodeShape
 ): ShapeNodeData {
     const properties: Record<string, PropertyValue> = {};
@@ -172,6 +178,7 @@ function shapeDataToBlogData(shapeData: ShapeNodeData): BlogNodeData {
  */
 const NODE_TYPE_MAP: Record<string, string> = {
     'BlogPosting': 'blog',
+    'SiteNavigationElement': 'navigation',
     // Future node types:
     // 'Person': 'person',
     // 'Project': 'project',
@@ -192,6 +199,7 @@ function getNodeTypeForShape(shape: NodeShape): string {
 /**
  * Convert RDF store contents to SvelteFlow nodes and edges
  * Uses SHACL shapes to determine which resources to visualize and how
+ * Supports both NamedNode and BlankNode subjects
  * 
  * @param dataStore - Store containing instance data (data.ttl)
  * @param shapeStore - Store containing SHACL shapes (shapes.ttl) - can be same as dataStore
@@ -208,7 +216,10 @@ export function quadsToFlowElements(
     
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    const nodeIRIs = new Set<string>();
+    // Track node IDs (includes both named and blank node values)
+    const nodeIds = new Set<string>();
+    // Map from node ID to the original subject term (for edge creation)
+    const subjectMap = new Map<string, SubjectNode>();
     
     // For each shape, find instances of its target class and create nodes
     // 1st forward pass: NODES
@@ -234,35 +245,41 @@ export function quadsToFlowElements(
                 data = shapeData;
             }
             
+            // Use subject.value as ID (works for both NamedNode and BlankNode)
+            const nodeId = subject.value;
+            
             nodes.push({
-                id: subject.value,
+                id: nodeId,
                 type: nodeType,
                 position,
                 data: data as unknown as Record<string, unknown>,
             });
             
-            nodeIRIs.add(subject.value);
+            nodeIds.add(nodeId);
+            subjectMap.set(nodeId, subject);
         }
     }
     
     // Create edges for object properties pointing to other visualized nodes
     // 2nd forward pass: EDGES
-    for (const nodeIRI of nodeIRIs) {
-        const quads = dataStore.getQuads(namedNode(nodeIRI), null, null, null);
+    for (const [nodeId, subject] of subjectMap) {
+        // Query using the original term (works for both NamedNode and BlankNode)
+        const quads = dataStore.getQuads(subject, null, null, null);
         
         for (const quad of quads) {
-            if (quad.object.termType === 'NamedNode') {
-                const targetIRI = quad.object.value;
+            // Check if the object is a node we've visualized (NamedNode or BlankNode)
+            if (quad.object.termType === 'NamedNode' || quad.object.termType === 'BlankNode') {
+                const targetId = quad.object.value;
                 
-                if (nodeIRIs.has(targetIRI)) {
+                if (nodeIds.has(targetId)) {
                     const edgeLabel = getLocalName(quad.predicate.value);
                     edges.push({
-                        id: `${nodeIRI}-${quad.predicate.value}-${targetIRI}`,
-                        source: nodeIRI,
-                        target: targetIRI,
+                        id: `${nodeId}-${quad.predicate.value}-${targetId}`,
+                        source: nodeId,
+                        target: targetId,
                         label: edgeLabel,
                     });
-                    console.log(`[FlowMapper] Edge: ${getLocalName(nodeIRI)} -[${edgeLabel}]-> ${getLocalName(targetIRI)}`);
+                    console.log(`[FlowMapper] Edge: ${getLocalName(nodeId)} -[${edgeLabel}]-> ${getLocalName(targetId)}`);
                 }
             }
         }

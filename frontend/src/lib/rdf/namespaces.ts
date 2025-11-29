@@ -25,8 +25,12 @@ export const RDFS = {
 } as const;
 
 export const SCHEMA = {
+    // Classes
     BlogPosting: namedNode(`${PREFIXES.schema}BlogPosting`),
+    Blog: namedNode(`${PREFIXES.schema}Blog`),
     Person: namedNode(`${PREFIXES.schema}Person`),
+    SiteNavigationElement: namedNode(`${PREFIXES.schema}SiteNavigationElement`),
+    // Properties
     headline: namedNode(`${PREFIXES.schema}headline`),
     author: namedNode(`${PREFIXES.schema}author`),
     datePublished: namedNode(`${PREFIXES.schema}datePublished`),
@@ -34,6 +38,10 @@ export const SCHEMA = {
     abstract: namedNode(`${PREFIXES.schema}abstract`),
     keywords: namedNode(`${PREFIXES.schema}keywords`),
     articleBody: namedNode(`${PREFIXES.schema}articleBody`),
+    hasPart: namedNode(`${PREFIXES.schema}hasPart`),
+    blogPost: namedNode(`${PREFIXES.schema}blogPost`),
+    name: namedNode(`${PREFIXES.schema}name`),
+    description: namedNode(`${PREFIXES.schema}description`),
 } as const;
 
 export const SH = {

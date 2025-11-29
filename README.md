@@ -25,25 +25,20 @@ It a website with a blog!
 
 ## Path Forward
 
-### Phase 1: Foundation & Cleanup ✅
+### Phase 1: Foundation & Cleanup
 - [x] Frontend-side reactive triple store (`RdfStore` with Svelte 5 runes)
 - [x] SHACL-driven flow mapping (shapes.ttl → SvelteFlow nodes)
 - [x] Generic `ShapeNode` component for shape-based rendering
 - [x] PersonNodeShape for testing generic rendering
 - [ ] Improve Node components
-    - [ ] Simplify with shadcn Item (instead of Card)
-    - [ ] ShapeNode w/ better hints and scrutinize w/ more difficult shacl shapes
+    - [x] Simplify with shadcn Item (instead of Card)
+    - [x] ShapeNode w/ better hints and scrutinize w/ more difficult shacl shapes
     - [ ] Custom edge and edge anchors
-- [ ] Remove redundant/unused code; resolve NOTE's and TODO's
+- [x] Remove redundant/unused code; resolve NOTE's and TODO's
+- [ ] Make x/y properties optional and implement dynamic placement of blog and it's blogposts (with pagination)
 - [ ] Shape-aware RDF triples view (use shape to construct queries and populate Dialog)
 - [ ] Turtle/N-Triples serialization in dialogs
 - [ ] Revise shacl-parser.ts to be more spec compliant: generic parent Shape interface, property paths, etc.
-
-#### Return to the use-case!
-- [ ] Introduce schema:Blog that links to schema:BlogPosting in data.ttl
-- [ ] Visualize schema:SiteNavigationElement node with an action (loaded on mount) to view the blog and its posts (request made to the backend)
-- [ ] Thats the first node-based storytelling use-case! A user on /app is met with a canvas with on it a node (a kind of panel or base interface for new users) with a button that, when clicked, requests the blog posts (also nodes on the canvas) and adds them to the canvas.
-
 
 
 ### Phase 2: Data Loading & Backend Integration

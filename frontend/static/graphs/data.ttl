@@ -5,29 +5,9 @@
 @prefix schema: <https://schema.org/> .
 @prefix rxyz: <http://rosyc.xyz#> .
 
-# These are not used, but we should create an ontology to materialize all these equivalences
-# @prefix foaf: <http://xmlns.com/foaf/0.1/> .
-# @prefix sioc: <http://rdfs.org/sioc/ns#> .
-# @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
-# @prefix cito: <http://purl.org/spar/cito/> .
-# @prefix prov: <http://www.w3.org/ns/prov#> .
-
-
-<http://rosyc.xyz#> a schema:WebPage ;
-    schema:name "robsyc.xyz" ;
-    schema:creator rxyz:me ;
-    schema:description "robsyc's personal knowledge graph" ;
-    schema:hasPart [
-        a schema:SiteNavigationElement ;
-        rxyz:x 0; rxyz:y 0 ;
-        schema:name "Navigation" ;
-        schema:description "Navigation links to load content" ;
-        schema:hasPart rxyz:Blog ;
-    ]
-.
 
 rxyz:me a schema:Person ;
-    rxyz:x -350 ; rxyz:y 100 ;
+    rxyz:x 800 ; rxyz:y 450 ;
     schema:givenName "Robbe" ;
     schema:familyName "Claeys" ;
     schema:birthDate "2000-04-03"^^xsd:date ;
@@ -35,17 +15,18 @@ rxyz:me a schema:Person ;
         a schema:Place ;
         schema:name "Ghent, Belgium" ;
     ] ;
+    # rdfs:comment "Hahahaha this is me! I'm a person." ;
 .
 
 rxyz:MyBlog a schema:Blog ;
-    rxyz:x -350; rxyz:y 100 ;
+    rxyz:x -300; rxyz:y -150 ;
     schema:name "My Blog" ;
     schema:description "This is my blog, where I write about my thoughts, opinions and beliefs." ;
     schema:blogPost rxyz:firstBlogPost, rxyz:shaclDrivenUI ;
 .
 
 rxyz:firstBlogPost a schema:BlogPosting ;
-    rxyz:x 0; rxyz:y 0 ;
+    rxyz:x 0; rxyz:y 500 ;
     schema:author rxyz:me ;
     schema:headline "What am I looking at?" ;
     schema:datePublished "2025-01-01T00:00:00"^^xsd:dateTime ;
