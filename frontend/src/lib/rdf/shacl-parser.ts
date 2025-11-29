@@ -66,7 +66,7 @@ export interface PropertyShape {
 // Nice diagram here: https://www.w3.org/TR/shacl12-core/#constraints-section
 //
 // - SHACL defines two main kinds of shapes: NodeShape and PropertyShape. A shape is a “property shape” if (and only if) it has a sh:path. Other shapes (without sh:path) are node shapes.
-// - A PropertyShape may include nested property constraints on the value nodes reachable via that path — via the sh:property parameter.
+// - A PropertyShape may include nested property constraints on the value nodes reachable via that path — via the sh:property parameter. Potentially useful with Breadcrumb navigation!
 // - The value of sh:path is not always a simple IRI: it can be any “well-formed SHACL property path” (e.g. sequence, alternative, inverse, etc.)
 // - Non-validating shape characteristics: https://www.w3.org/TR/shacl12-core/#nonValidation
 // - Core constraints: https://www.w3.org/TR/shacl12-core/#core-components

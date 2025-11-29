@@ -110,33 +110,3 @@ docker-compose up tentris meilisearch
 curl -H "accept:text/turtle" http://localhost:3000 -L
 curl -H "accept:application/ld+json" http://localhost:3000 -L
 ```
-
-Last prompt:
-```
-@README.md  We are extending the work in, and andressing the TODO's and NOTE's of our @Svelte-based @frontend, namely @frontend/src/lib/stores/rdf.svelte.ts triple store wrapper, @frontend/src/lib/rdf/flow-mapper.ts RDF to SvelteFlow @frontend/src/lib/components/flow/BlogNode.svelte of @frontend/static/graphs/data.ttl 
-
-In short, our applications seeks to:
-- fetch triples from the FastAPI backend
-- store triples in the frontend (session)
-- parse (and transform) them, but most importantly,
-- visualize them through the node-based @SvelteFlowExamples UI library (@SvelteFlowAPI)
-
-The goal is really to make it possible for users to view and interact with triples through a graph-like interface.
-- requires round-trip mapping logic from triples to SvelteFlow LPG-like nodes and edges.
-- predicates can themselves be nodes in RDF, so a node in our UI would be more like a paricular shape; a BlogNode shape
-- will likely entail @SHACL-Primer (and @DASH) for display and form generation, possibly also @SPARQL1.1-Query (https://uispin.org/ui.html)
-
-We want triples to be tighly integrated into the UI and UX such that
-- a user could click on a node and request to see the actual underlying triples, or a preview of the triples that are about to be inserted w/ a form submission
-- it is robust and allows for flexibility when we cannot (yet) visualize certain triple patterns, but can associate them to visual entities, we should treat shapes as first class citizens in our UI
-
-I have left you with lots of informative resources and a broad objective, begin with a deep dive into the codebase and the information provided. Analyze the TODO's in the aformentioned files and think of next steps in our iterative development process, for example, 
-- adding a second blog to the ttl data
-- add functionality to load triples from a link (perhaps in the @edit route only)
-- SvelteFlow PersonNode
-- utilize shacl @frontend/static/graphs/shapes.ttl to drive form generation and data viewing, rather than hardcoding properties in our RDF to SvelteFlow mapping
-
-Think, prioritize, plan.
-
-https://www.mdpi.com/2673-6470/5/4/56 
-```
