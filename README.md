@@ -32,7 +32,7 @@ It a website with a blog!
 - [x] PersonNodeShape for testing generic rendering
 - [ ] Improve Node components
     - [ ] Simplify with shadcn Item (instead of Card)
-    - [ ] ShapeNode w/ better hints and scrutinize w/ difficult shacl shapes
+    - [ ] ShapeNode w/ better hints and scrutinize w/ more difficult shacl shapes
     - [ ] Custom edge and edge anchors
 - [ ] Remove redundant/unused code; resolve NOTE's and TODO's
 - [ ] Shape-aware RDF triples view (use shape to construct queries and populate Dialog)
@@ -41,8 +41,10 @@ It a website with a blog!
 
 #### Return to the use-case!
 - [ ] Introduce schema:Blog that links to schema:BlogPosting in data.ttl
-- [ ] Visualize the blog as a node with an action (loaded on mount) to view the blog posts as a list (request made to the backend)
+- [ ] Visualize schema:SiteNavigationElement node with an action (loaded on mount) to view the blog and its posts (request made to the backend)
 - [ ] Thats the first node-based storytelling use-case! A user on /app is met with a canvas with on it a node (a kind of panel or base interface for new users) with a button that, when clicked, requests the blog posts (also nodes on the canvas) and adds them to the canvas.
+
+
 
 ### Phase 2: Data Loading & Backend Integration
 - [ ] No more triples loaded from the frontend /static, but dynamically loaded from the backend
