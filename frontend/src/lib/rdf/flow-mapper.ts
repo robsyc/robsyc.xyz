@@ -196,6 +196,14 @@ function getNodeTypeForShape(shape: NodeShape): string {
  * Main Conversion Functions
  */
 
+/** Options for quadsToFlowElements */
+export interface FlowMapperOptions {
+    /** Set of node IDs that already exist - skip creating these nodes */
+    existingNodeIds?: Set<string>;
+    /** Set of edge IDs that already exist - skip creating these edges */
+    existingEdgeIds?: Set<string>;
+}
+
 /**
  * Convert RDF store contents to SvelteFlow nodes and edges
  * Uses SHACL shapes to determine which resources to visualize and how
@@ -203,10 +211,22 @@ function getNodeTypeForShape(shape: NodeShape): string {
  * 
  * @param dataStore - Store containing instance data (data.ttl)
  * @param shapeStore - Store containing SHACL shapes (shapes.ttl) - can be same as dataStore
+ * @param options - Optional parameters to skip already-existing nodes/edges
+ * 
+ * @example
+ * // First load: create all nodes and edges
+ * const elements = quadsToFlowElements(rdfStore);
+ * 
+ * @example
+ * // Subsequent loads: only create new nodes/edges
+ * const existingNodeIds = new Set(nodes.map(n => n.id));
+ * const existingEdgeIds = new Set(edges.map(e => e.id));
+ * const newElements = quadsToFlowElements(rdfStore, undefined, { existingNodeIds, existingEdgeIds });
  */
 export function quadsToFlowElements(
     dataStore: RdfStore, 
-    shapeStore?: RdfStore
+    shapeStore?: RdfStore,
+    options?: FlowMapperOptions
 ): { nodes: Node[]; edges: Edge[]; shapeRegistry: ShapeRegistry } {
     // Use same store for shapes if not provided separately
     const shapesStore = shapeStore ?? dataStore;
@@ -216,8 +236,9 @@ export function quadsToFlowElements(
     
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    // Track node IDs (includes both named and blank node values)
-    const nodeIds = new Set<string>();
+    
+    // Track all node IDs (includes existing + new, for edge creation)
+    const allNodeIds = new Set<string>(options?.existingNodeIds ?? []);
     // Map from node ID to the original subject term (for edge creation)
     const subjectMap = new Map<string, SubjectNode>();
     
@@ -227,11 +248,20 @@ export function quadsToFlowElements(
         const subjects = dataStore.getResourcesByType(targetClassIRI);
         const nodeType = getNodeTypeForShape(shape);
         
-        if (subjects.length > 0) {
-            console.log(`[FlowMapper] Found ${subjects.length} ${shape.targetClassLocalName} instance(s) → nodeType: "${nodeType}"`);
-        }
-        
+        let newCount = 0;
         for (const subject of subjects) {
+            // Use subject.value as ID (works for both NamedNode and BlankNode)
+            const nodeId = subject.value;
+            
+            // Track for edge creation regardless of whether we create the node
+            subjectMap.set(nodeId, subject);
+            
+            // Skip if node already exists
+            if (options?.existingNodeIds?.has(nodeId)) {
+                allNodeIds.add(nodeId);
+                continue;
+            }
+            
             const position = getPosition(dataStore, subject);
             
             // Extract data based on shape
@@ -245,9 +275,6 @@ export function quadsToFlowElements(
                 data = shapeData;
             }
             
-            // Use subject.value as ID (works for both NamedNode and BlankNode)
-            const nodeId = subject.value;
-            
             nodes.push({
                 id: nodeId,
                 type: nodeType,
@@ -255,8 +282,12 @@ export function quadsToFlowElements(
                 data: data as unknown as Record<string, unknown>,
             });
             
-            nodeIds.add(nodeId);
-            subjectMap.set(nodeId, subject);
+            allNodeIds.add(nodeId);
+            newCount++;
+        }
+        
+        if (newCount > 0) {
+            console.log(`[FlowMapper] Created ${newCount} new ${shape.targetClassLocalName} node(s) → nodeType: "${nodeType}"`);
         }
     }
     
@@ -271,7 +302,14 @@ export function quadsToFlowElements(
             if (quad.object.termType === 'NamedNode' || quad.object.termType === 'BlankNode') {
                 const targetId = quad.object.value;
                 
-                if (nodeIds.has(targetId)) {
+                if (allNodeIds.has(targetId)) {
+                    const edgeId = `${nodeId}-${quad.predicate.value}-${targetId}`;
+                    
+                    // Skip if edge already exists
+                    if (options?.existingEdgeIds?.has(edgeId)) {
+                        continue;
+                    }
+                    
                     const edgeLabel = getLocalName(quad.predicate.value);
                     edges.push({
                         id: `${nodeId}-${quad.predicate.value}-${targetId}`,
@@ -285,7 +323,7 @@ export function quadsToFlowElements(
         }
     }
     
-    console.log(`[FlowMapper] ✓ Created ${nodes.length} nodes and ${edges.length} edges from ${shapeRegistry.size} shapes`);
+    console.log(`[FlowMapper] ✓ Created ${nodes.length} new nodes and ${edges.length} new edges from ${shapeRegistry.size} shapes`);
     
     return { nodes, edges, shapeRegistry };
 }

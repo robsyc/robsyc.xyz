@@ -42,11 +42,11 @@ It a website with a blog!
 
 
 ### Phase 2: Data Loading & Backend Integration
-- [ ] No more triples loaded from the frontend /static, but dynamically loaded from the backend
-- [ ] Load triples from URL/endpoint
+- [x] No more triples loaded from the frontend /static, but dynamically loaded from the backend
+- [x] Load triples from URL/endpoint
 - [ ] FastAPI to SvelteKit API gateway
-  - [ ] SPARQL query endpoint integration
-  - [ ] Request shapes
+  - [x] SPARQL query endpoint integration
+  - [x] Request shapes TO BE IMPROVED
   - [ ] SHACL validation/inference endpoints
   - [ ] Triple update/mutation endpoints
   - [ ] Content negotiation

@@ -11,12 +11,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/shapes")
+@router.get("/shapes", deprecated=True)
 async def get_shapes_graph(
     shacl_service: ShaclService = ShaclServiceDep,
 ) -> Response:
     """
     Retrieve the SHACL shapes graph from the triple store.
+    
+    DEPRECATED: Use GET /sparql/graphs/shapes instead, which supports
+    filtering by target_class for more efficient fetching.
     """
     shapes_graph = await shacl_service.fetch_shapes_graph()
     ttl = shapes_graph.serialize(format="turtle")

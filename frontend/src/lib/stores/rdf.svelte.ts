@@ -2,6 +2,7 @@ import { Store, Parser, Writer, DataFactory, Reasoner } from 'n3';
 import type { Quad, NamedNode, BlankNode, Term, Quad_Subject, Quad_Predicate, Quad_Object, Quad_Graph } from 'n3';
 import SHACLValidator from 'rdf-validate-shacl'
 import { RDF, PREFIXES } from '$lib/rdf/namespaces';
+import { fetchGraph, type GraphName, type FetchGraphOptions } from '$lib/rdf/api';
 
 // N3.DataFactory will give you the factory functions to create triples and quads
 // http://rdf.js.org/#datafactory-interface
@@ -11,7 +12,8 @@ const { namedNode, literal, quad } = DataFactory;
  * Reactive RDF Store wrapper around N3.Store using Svelte 5 runes.
  * Provides methods to load, query, and manipulate RDF triples.
  *  - Reactive version counter for triggering derived computations
- *  - loadFromUrl(url) - Fetch and parse TTL files
+ *  - loadFromUrl(url) - Fetch and parse TTL from static files
+ *  - loadFromBackend(graphName, options) - Fetch named graph from backend API with optional targetClass filter
  *  - loadTurtle(content) - Parse turtle strings
  *  - getResourcesByType(typeIRI) - Query resources by rdf:type
  *  - getResourceData(subject) - Get all predicates/objects for a subject
@@ -56,7 +58,7 @@ export class RdfStore {
     }
 
     /**
-     * Load and parse Turtle content from a URL
+     * Load and parse Turtle content from a URL (for static files or development)
      */
     async loadFromUrl(url: string): Promise<void> {
         if (this.#loadedUrls.has(url)) {
@@ -75,6 +77,54 @@ export class RdfStore {
             console.log(`[RdfStore] Loaded ${url}, store now has ${this.#store.size} quads`);
         } catch (error) {
             console.error(`[RdfStore] Error loading ${url}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Load a named graph from the backend API
+     * 
+     * Always fetches from the backend, but N3.Store handles deduplication internally.
+     * Returns the number of NEW quads added (0 if all quads already existed).
+     * 
+     * @param graphName - The graph to load: 'home', 'data', or 'shapes'
+     * @param options - Optional parameters including targetClass filter
+     * @returns Number of new quads added to the store
+     * 
+     * @example
+     * // Load home graph (entry point)
+     * const newQuads = await rdfStore.loadFromBackend('home');
+     * 
+     * @example
+     * // Load shapes for a specific class
+     * const newQuads = await rdfStore.loadFromBackend('shapes', { targetClass: 'schema:BlogPosting' });
+     */
+    async loadFromBackend(graphName: GraphName, options?: FetchGraphOptions): Promise<number> {
+        const logKey = options?.targetClass 
+            ? `${graphName}:${options.targetClass}`
+            : graphName;
+
+        try {
+            const sizeBefore = this.#store.size;
+            const turtleContent = await fetchGraph(graphName, options);
+            
+            // Parse and add quads - N3.Store deduplicates automatically
+            const parser = new Parser();
+            const quads = parser.parse(turtleContent);
+            this.#store.addQuads(quads);
+            
+            const newQuads = this.#store.size - sizeBefore;
+            
+            if (newQuads > 0) {
+                this.version++;
+                console.log(`[RdfStore] Loaded ${newQuads} new quads from '${logKey}', store now has ${this.#store.size} quads`);
+            } else {
+                console.log(`[RdfStore] No new quads from '${logKey}' (all ${quads.length} quads already in store)`);
+            }
+            
+            return newQuads;
+        } catch (error) {
+            console.error(`[RdfStore] Error loading '${logKey}' from backend:`, error);
             throw error;
         }
     }

@@ -3,6 +3,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix schema: <https://schema.org/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix rxyz: <http://rosyc.xyz#> .
 
 # These are not used, but we should create an ontology to materialize all these equivalences
@@ -16,22 +17,44 @@
     schema:name "robsyc.xyz" ;
     schema:creator rxyz:me ;
     schema:description "robsyc's personal knowledge graph" ;
-    schema:hasPart [
-        a schema:SiteNavigationElement ;
-        rxyz:x 0 ; rxyz:y 0 ;
-        schema:name "Welcome" ;
-        schema:description "Your entry point to robsyc's knowledge graph. Load content to explore." ;
-        schema:hasPart rxyz:MyBlog ;
-    ] ;
+    schema:hasPart rxyz:WelcomeNav ;
+.
+
+rxyz:WelcomeNav a schema:SiteNavigationElement ;
+    rxyz:x 0 ;
+    rxyz:y 0 ;
+    schema:name "Welcome" ;
+    schema:description "Your entry point to robsyc's knowledge graph. Load content to explore." ;
+    schema:hasPart rxyz:MyBlog ;
 .
 
 rxyz:HomePage a sh:NodeShape ;
     sh:targetClass schema:SiteNavigationElement ;
     sh:closed false ;
     sh:property 
-        [ sh:path schema:name ] ,
-        [ sh:path schema:description ] ,
-        [ sh:path schema:hasPart ] ,
-        [ sh:path rxyz:x ] ,
-        [ sh:path rxyz:y ] ;
+        rxyz:HomePage_nameProp ,
+        rxyz:HomePage_descProp ,
+        rxyz:HomePage_hasPartProp ,
+        rxyz:HomePage_xProp ,
+        rxyz:HomePage_yProp ;
+.
+
+rxyz:HomePage_nameProp a sh:PropertyShape ;
+    sh:path schema:name ;
+.
+
+rxyz:HomePage_descProp a sh:PropertyShape ;
+    sh:path schema:description ;
+.
+
+rxyz:HomePage_hasPartProp a sh:PropertyShape ;
+    sh:path schema:hasPart ;
+.
+
+rxyz:HomePage_xProp a sh:PropertyShape ;
+    sh:path rxyz:x ;
+.
+
+rxyz:HomePage_yProp a sh:PropertyShape ;
+    sh:path rxyz:y ;
 .

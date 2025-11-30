@@ -4,7 +4,7 @@
    * 
    * Displays a navigation element with action buttons for each hasPart reference.
    * Used as the entry point in the knowledge graph, allowing users to load
-   * additional content dynamically.
+   * additional content dynamically from the backend.
    */
   import { Handle, Position, type NodeProps } from '@xyflow/svelte';
   
@@ -15,22 +15,27 @@
 
   import { ArrowRight, Compass } from "@lucide/svelte";
 
-  import { shortenIRI, getLocalName } from '$lib/rdf/utils';
+  import { getLocalName } from '$lib/rdf/utils';
   import type { ShapeNodeData } from '$lib/rdf/flow-mapper';
 
-  /** Extended data interface with the onLoadPart callback */
+  /** Map from part IRI local names to backend graph names */
+  const IRI_TO_GRAPH: Record<string, 'home' | 'data' | 'shapes'> = {
+    'MyBlog': 'data',
+    // Add more mappings as needed
+  };
+
+  /** Extended data interface with the onLoadGraph callback */
   interface NavigationNodeData extends ShapeNodeData {
-    onLoadPart?: (partIRI: string) => void;
+    onLoadGraph?: (graphName: 'home' | 'data' | 'shapes') => void;
   }
 
   let { id, data, selected }: NodeProps = $props();
   
-  // Cast to our extended data type (includes onLoadPart callback)
+  // Cast to our extended data type (includes onLoadGraph callback)
   const nodeData = data as unknown as NavigationNodeData;
-  const iri = nodeData.iri || id;
   
   // Extract the callback from data (injected by +page.svelte)
-  const onLoadPart = nodeData.onLoadPart;
+  const onLoadGraph = nodeData.onLoadGraph;
   
   // Get the name property (title)
   const name = $derived(nodeData.properties?.['name']?.value ?? 'Navigation');
@@ -43,17 +48,21 @@
     const partProp = nodeData.properties?.['hasPart'];
     if (!partProp) return [];
     
-    // Return all part IRIs with their display names
-    return partProp.values.map(iri => ({
-      iri,
-      label: getLocalName(iri),
-      shortIRI: shortenIRI(iri),
-    }));
+    // Return all parts with their display names and graph mappings
+    return partProp.values.map(iri => {
+      const localName = getLocalName(iri);
+      const graphName = IRI_TO_GRAPH[localName];
+      return {
+        iri,
+        label: localName,
+        graphName,
+      };
+    }).filter(part => part.graphName); // Only show parts we know how to load
   });
   
-  function handleLoadPart(partIRI: string) {
-    console.log(`[NavigationNode] Load requested for: ${partIRI}`);
-    onLoadPart?.(partIRI);
+  function handleLoadGraph(graphName: 'home' | 'data' | 'shapes') {
+    console.log(`[NavigationNode] Loading graph: ${graphName}`);
+    onLoadGraph?.(graphName);
   }
 </script>
 
@@ -92,7 +101,7 @@
               variant="secondary" 
               size="sm" 
               class="w-full justify-between group"
-              onclick={() => handleLoadPart(part.iri)}
+              onclick={() => handleLoadGraph(part.graphName)}
             >
               <span class="font-medium">{part.label}</span>
               <ArrowRight class="h-4 w-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />

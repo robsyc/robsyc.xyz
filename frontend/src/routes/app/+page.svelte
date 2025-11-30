@@ -49,45 +49,59 @@
     });
     
     /**
-     * Map from part IRI to the graph file that should be loaded
-     * For now, this is a simple mapping; in the future, this could be
-     * fetched from the backend or derived from the RDF data itself
-     */
-    const PART_TO_GRAPH: Record<string, string> = {
-        'http://rosyc.xyz#MyBlog': '/graphs/data.ttl',
-    };
-    
-    /**
-     * Load additional graph content dynamically
+     * Load additional graph content dynamically from the backend
      * Called when user clicks a hasPart button in NavigationNode
+     * 
+     * Always rebuilds based on current UI state - if user deleted nodes,
+     * they will be recreated from the RDF store.
+     * 
+     * @param graphName - The graph to load: 'data', 'shapes', etc.
      */
-    async function loadGraph(partIRI: string) {
-        const graphUrl = PART_TO_GRAPH[partIRI];
-        if (!graphUrl) {
-            console.warn(`[App] No graph mapping found for: ${partIRI}`);
-            return;
-        }
-        
-        console.log(`[App] Loading graph for ${partIRI}: ${graphUrl}`);
+    async function loadGraph(graphName: 'home' | 'data' | 'shapes') {
+        console.log(`[App] Loading graph: ${graphName}`);
         isLoading = true;
         loadingMessage = 'Loading additional content...';
         
         try {
-            // Load shapes first if not already loaded
-            await rdfStore.loadFromUrl('/graphs/shapes.ttl');
+            // Load shapes first (N3.Store deduplicates internally)
+            await rdfStore.loadFromBackend('shapes');
             
             // Load the requested graph data
-            await rdfStore.loadFromUrl(graphUrl);
+            await rdfStore.loadFromBackend(graphName);
             
-            // Rebuild flow elements with all loaded data
-            const elements = quadsToFlowElements(rdfStore);
+            // Track CURRENT UI nodes for incremental update
+            // This allows deleted nodes to be recreated
+            const existingNodeIds = new Set(nodes.map(n => n.id));
+            const existingEdgeIds = new Set(edges.map(e => e.id));
+            const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
             
-            // Re-inject callbacks for navigation nodes after rebuilding
-            nodes = injectCallbacks(elements.nodes);
-            edges = elements.edges;
+            // Build nodes/edges for resources NOT currently in UI
+            const elements = quadsToFlowElements(rdfStore, undefined, {
+                existingNodeIds,
+                existingEdgeIds,
+            });
+            
+            if (elements.nodes.length === 0 && elements.edges.length === 0) {
+                console.log(`[App] No new nodes/edges to add (all already visible)`);
+                return;
+            }
+            
+            // Inject callbacks for new navigation nodes
+            const newNodes = injectCallbacks(elements.nodes);
+            
+            // Merge: preserve existing positions for any nodes that might be rebuilt,
+            // add new nodes at their RDF-defined positions
+            const mergedNewNodes = newNodes.map(node => ({
+                ...node,
+                position: existingPositions.get(node.id) ?? node.position,
+            }));
+            
+            // Append new nodes and edges to existing ones
+            nodes = [...nodes, ...mergedNewNodes];
+            edges = [...edges, ...elements.edges];
             shapeRegistry = elements.shapeRegistry;
             
-            console.log(`[App] Graph loaded. Now have ${nodes.length} nodes and ${edges.length} edges`);
+            console.log(`[App] Graph loaded. Added ${mergedNewNodes.length} nodes, ${elements.edges.length} edges. Total: ${nodes.length} nodes, ${edges.length} edges`);
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to load additional content';
             console.error('[App] Error loading graph:', e);
@@ -107,7 +121,7 @@
                     ...node,
                     data: {
                         ...node.data,
-                        onLoadPart: loadGraph,
+                        onLoadGraph: loadGraph,
                     },
                 };
             }
@@ -115,13 +129,13 @@
         });
     }
     
-    // Load initial home.ttl on mount
+    // Load initial data from backend on mount
     onMount(async () => {
         try {
-            // Load home.ttl which contains the navigation element and its shape
+            // Load home graph which contains the navigation element and its shape
             loadingMessage = 'Loading home...';
-            await rdfStore.loadFromUrl('/graphs/home.ttl');
-            console.log('[App] Loaded home.ttl');
+            await rdfStore.loadFromBackend('home');
+            console.log('[App] Loaded home graph from backend');
             
             // Convert RDF to SvelteFlow elements using shape-driven mapping
             loadingMessage = 'Building visualization...';
