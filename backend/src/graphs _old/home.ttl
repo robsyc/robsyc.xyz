@@ -1,0 +1,60 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix schema: <https://schema.org/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix rxyz: <http://rosyc.xyz#> .
+
+# These are not used, but we should create an ontology to materialize all these equivalences
+# @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+# @prefix sioc: <http://rdfs.org/sioc/ns#> .
+# @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+# @prefix cito: <http://purl.org/spar/cito/> .
+# @prefix prov: <http://www.w3.org/ns/prov#> .
+
+<http://rosyc.xyz#> a schema:WebPage ;
+    schema:name "robsyc.xyz" ;
+    schema:creator rxyz:me ;
+    schema:description "robsyc's personal knowledge graph" ;
+    schema:hasPart rxyz:WelcomeNav ;
+.
+
+rxyz:WelcomeNav a schema:SiteNavigationElement ;
+    rxyz:x 0 ;
+    rxyz:y 0 ;
+    schema:name "Welcome" ;
+    schema:description "Your entry point to robsyc's knowledge graph. Load content to explore." ;
+    schema:hasPart rxyz:MyBlog ;
+.
+
+rxyz:HomePage a sh:NodeShape ;
+    sh:targetClass schema:SiteNavigationElement ;
+    sh:closed false ;
+    sh:property 
+        rxyz:HomePage_nameProp ,
+        rxyz:HomePage_descProp ,
+        rxyz:HomePage_hasPartProp ,
+        rxyz:HomePage_xProp ,
+        rxyz:HomePage_yProp ;
+.
+
+rxyz:HomePage_nameProp a sh:PropertyShape ;
+    sh:path schema:name ;
+.
+
+rxyz:HomePage_descProp a sh:PropertyShape ;
+    sh:path schema:description ;
+.
+
+rxyz:HomePage_hasPartProp a sh:PropertyShape ;
+    sh:path schema:hasPart ;
+.
+
+rxyz:HomePage_xProp a sh:PropertyShape ;
+    sh:path rxyz:x ;
+.
+
+rxyz:HomePage_yProp a sh:PropertyShape ;
+    sh:path rxyz:y ;
+.

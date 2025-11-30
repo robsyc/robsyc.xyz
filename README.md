@@ -42,7 +42,7 @@ It a website with a blog!
 
 
 ### Phase 2: Data Loading & Backend Integration
-- [x] No more triples loaded from the frontend /static, but dynamically loaded from the backend
+- [x] triples dynamically loaded from the backend
 - [x] Load triples from URL/endpoint
 - [ ] FastAPI to SvelteKit API gateway
   - [x] SPARQL query endpoint integration

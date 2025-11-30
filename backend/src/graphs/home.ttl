@@ -17,7 +17,7 @@
     schema:name "robsyc.xyz" ;
     schema:creator rxyz:me ;
     schema:description "robsyc's personal knowledge graph" ;
-    schema:hasPart rxyz:WelcomeNav ;
+    schema:hasPart rxyz:robsyc , rxyz:WelcomeNav ;
 .
 
 rxyz:WelcomeNav a schema:SiteNavigationElement ;
@@ -25,36 +25,229 @@ rxyz:WelcomeNav a schema:SiteNavigationElement ;
     rxyz:y 0 ;
     schema:name "Welcome" ;
     schema:description "Your entry point to robsyc's knowledge graph. Load content to explore." ;
-    schema:hasPart rxyz:MyBlog ;
+    schema:potentialAction rxyz:SearchBlogAction, rxyz:SearchAboutAction ;
+    # schema:hasPart rxyz:MyBlog, rxyz:MyAbout ;
 .
 
-rxyz:HomePage a sh:NodeShape ;
-    sh:targetClass schema:SiteNavigationElement ;
-    sh:closed false ;
-    sh:property 
-        rxyz:HomePage_nameProp ,
-        rxyz:HomePage_descProp ,
-        rxyz:HomePage_hasPartProp ,
-        rxyz:HomePage_xProp ,
-        rxyz:HomePage_yProp ;
+rxyz:robsyc a foaf:Agent ;
+    rxyz:x -200 ;
+    rxyz:y 100 ;
+    schema:name "robsyc" ;
+    schema:image <https://avatars.githubusercontent.com/u/87700333> ;
+    schema:description "Your guide through this knowledge graph." ;
 .
 
-rxyz:HomePage_nameProp a sh:PropertyShape ;
+##############################################################################################################################################
+# Agent conversation and action elements
+##############################################################################################################################################
+
+rxyz:AgentConversation a schema:Conversation ;
+    schema:hasPart rxyz:WelcomeMessage ;
+.
+
+rxyz:WelcomeMessage a schema:Message ;
+    schema:sender rxyz:robsyc ;
+    schema:text """Hey there! 👋
+
+Welcome to my personal knowledge graph. This is an experimental space where semantic web meets modern UX.
+
+What would you like to explore?""" ;
+    # TODO: UI should visualize this underneath conversation with buttons for each action
+    schema:potentialAction rxyz:SearchBlogAction, rxyz:SearchAboutAction, rxyz:AskAgentAction ;
+.
+
+rxyz:SearchBlogAction a schema:SearchAction , schema:Action ;
+    schema:name "Search Blog" ; # TODO: UI should create button with this query
+    schema:target rxyz:BlogShape ;
+.
+
+rxyz:SearchAboutAction a schema:SearchAction , schema:Action ;
+    schema:name "Search About" ;
+    schema:target rxyz:AboutShape ;
+.
+
+rxyz:AskAgentAction a schema:AskAction , schema:Action ;
+    # schema:question ... # TODO: UI should create triple with user's question as object (schema:Question w/ schema:text)
+    # Sending this to backend triggers ML workflow to generate response
+    schema:name "Ask Agent" ;
+    schema:target rxyz:AgentConversation ;
+.
+
+##############################################################################################################################################
+# Reusable Property Shapes
+# These property shapes can be referenced by multiple node shapes to reduce redundancy.
+##############################################################################################################################################
+
+rxyz:NamePropertyShape a sh:PropertyShape ;
+    rdfs:label "Name Property" ;
+    rdfs:comment "Reusable property shape for schema:name - a required single string value." ;
     sh:path schema:name ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
 .
 
-rxyz:HomePage_descProp a sh:PropertyShape ;
+rxyz:DescriptionPropertyShape a sh:PropertyShape ;
+    rdfs:label "Description Property" ;
+    rdfs:comment "Reusable property shape for schema:description - an optional single string value." ;
     sh:path schema:description ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
 .
 
-rxyz:HomePage_hasPartProp a sh:PropertyShape ;
-    sh:path schema:hasPart ;
+rxyz:ImagePropertyShape a sh:PropertyShape ;
+    rdfs:label "Image Property" ;
+    rdfs:comment "Reusable property shape for schema:image - an optional IRI." ;
+    sh:path schema:image ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
 .
 
-rxyz:HomePage_xProp a sh:PropertyShape ;
+rxyz:TextPropertyShape a sh:PropertyShape ;
+    rdfs:label "Text Property" ;
+    rdfs:comment "Reusable property shape for schema:text - a required single string value." ;
+    sh:path schema:text ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+.
+
+rxyz:XPropertyShape a sh:PropertyShape ;
+    rdfs:label "X Coordinate Property" ;
+    rdfs:comment "Reusable property shape for rxyz:x - horizontal position for visual layout." ;
     sh:path rxyz:x ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
 .
 
-rxyz:HomePage_yProp a sh:PropertyShape ;
+rxyz:YPropertyShape a sh:PropertyShape ;
+    rdfs:label "Y Coordinate Property" ;
+    rdfs:comment "Reusable property shape for rxyz:y - vertical position for visual layout." ;
     sh:path rxyz:y ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:integer ;
+.
+
+rxyz:PotentialActionPropertyShape a sh:PropertyShape ;
+    rdfs:label "Potential Action Property" ;
+    rdfs:comment "Reusable property shape for schema:potentialAction - a required list of actions." ;
+    sh:path schema:potentialAction ;
+    sh:minCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:node rxyz:ActionShape ;
+.
+
+##############################################################################################################################################
+# Home page navigation shape
+##############################################################################################################################################
+
+rxyz:WelcomeNavShape a sh:NodeShape ;
+    rdfs:label "Welcome Navigation Shape" ;
+    rdfs:comment "Validates the welcome navigation element displayed on the home page." ;
+    sh:targetNode rxyz:WelcomeNav ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property 
+        rxyz:NamePropertyShape ,
+        rxyz:DescriptionPropertyShape ,
+        rxyz:PotentialActionPropertyShape ,
+        rxyz:XPropertyShape ,
+        rxyz:YPropertyShape ;
+.
+
+##############################################################################################################################################
+# Agent Shape
+##############################################################################################################################################
+
+rxyz:robsycAgentShape a sh:NodeShape ;
+    rdfs:label "Robsyc Agent Shape" ;
+    rdfs:comment "Validates the robsyc agent node that guides users through the knowledge graph." ;
+    sh:targetNode rxyz:robsyc ;
+    sh:property 
+        rxyz:NamePropertyShape ,
+        rxyz:DescriptionPropertyShape ,
+        rxyz:ImagePropertyShape ,
+        rxyz:XPropertyShape ,
+        rxyz:YPropertyShape ,
+        rxyz:robsycAgentShape_message ;
+.
+
+rxyz:robsycAgentShape_message a sh:PropertyShape ;
+    rdfs:label "Sent Messages Property" ;
+    rdfs:comment "Uses sh:inversePath to traverse from agent to messages where this agent is the sender." ;
+    sh:path [ sh:inversePath schema:sender ] ;
+    sh:minCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:node rxyz:MessageShape ;
+    sh:message "Agent must be referenced as sender of at least one message." ;
+.
+
+##############################################################################################################################################
+# Message Shape (nested from agent via inverse path)
+##############################################################################################################################################
+
+rxyz:MessageShape a sh:NodeShape ;
+    rdfs:label "Message Shape" ;
+    rdfs:comment "Validates messages in agent conversations, reached via inverse path from agent." ;
+    sh:targetClass schema:Message ;
+    sh:property 
+        rxyz:MessageShape_conversationPartOf ,
+        rxyz:MessageShape_sender ,
+        rxyz:TextPropertyShape ,
+        rxyz:PotentialActionPropertyShape ;
+.
+
+rxyz:MessageShape_conversationPartOf a sh:PropertyShape ;
+    rdfs:label "Part of Conversation Property" ;
+    rdfs:comment "Uses sh:inversePath to ensure this message is part of exactly one conversation." ;
+    sh:path [ sh:inversePath schema:hasPart ] ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class schema:Conversation ;
+    sh:message "Message must be part of exactly one schema:Conversation." ;
+.
+
+rxyz:MessageShape_sender a sh:PropertyShape ;
+    rdfs:label "Sender Property" ;
+    rdfs:comment "The agent who sent this message." ;
+    sh:path schema:sender ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI ;
+    sh:class foaf:Agent ;
+.
+
+##############################################################################################################################################
+# Action Shapes
+##############################################################################################################################################
+
+rxyz:ActionShape a sh:NodeShape ;
+    rdfs:label "Action Shape" ;
+    rdfs:comment "Validates actions that can be taken by the agent." ;
+    sh:targetClass schema:Action ;
+    sh:property 
+        rxyz:NamePropertyShape , 
+        rxyz:ActionShape_target ,
+        rxyz:ActionShape_question ;
+.
+
+rxyz:ActionShape_target a sh:PropertyShape ;
+    rdfs:label "Target Shape Property" ;
+    rdfs:comment "The SHACL shape IRI defining what content to retrieve." ;
+    sh:path schema:target ;
+    sh:nodeKind sh:IRI ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Action must target a URL." ;
+.
+
+rxyz:ActionShape_question a sh:PropertyShape ;
+    rdfs:label "AskAction Question Property" ;
+    rdfs:comment "User's question text (populated by UI when action is invoked)." ;
+    sh:path schema:question ;
+    sh:class schema:Question ;
+    sh:maxCount 1 ;
 .
