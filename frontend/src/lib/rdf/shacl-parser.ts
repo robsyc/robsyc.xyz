@@ -30,27 +30,60 @@ import { getLocalName } from './utils';
 type SubjectNode = NamedNode | BlankNode;
 
 /****************************************************************************************
+ * Property Path Types
+ * 
+ * SHACL property paths can be complex (inverse, sequence, alternative, etc.)
+ * We implement support for simple predicate paths and inverse paths.
+ * See: https://www.w3.org/TR/shacl/#property-paths
+ */
+
+/** 
+ * A SHACL property path - either a simple predicate IRI or an inverse path.
+ * This is a simplified implementation; full SHACL supports sequence, alternative, etc.
+ */
+export type PropertyPath =
+    | { type: 'Predicate'; iri: string }
+    | { type: 'Inverse'; path: PropertyPath };
+
+/**
+ * Get the display name for a property path
+ * For inverse paths, prefixes with "^" (SPARQL inverse syntax)
+ */
+export function getPathLocalName(path: PropertyPath): string {
+    switch (path.type) {
+        case 'Predicate':
+            return getLocalName(path.iri);
+        case 'Inverse':
+            return `^${getPathLocalName(path.path)}`;
+    }
+}
+
+/**
+ * Get the primary IRI from a property path (the innermost predicate IRI)
+ */
+export function getPathIRI(path: PropertyPath): string {
+    switch (path.type) {
+        case 'Predicate':
+            return path.iri;
+        case 'Inverse':
+            return getPathIRI(path.path);
+    }
+}
+
+/****************************************************************************************
  * Parsed property shape with extracted constraints
- * - A property shape is refferd to by a node shape via sh:property
- * - It described the constraints on the relationship between the NodeShape's focus node and the rachable node
+ * - A property shape is referred to by a node shape via sh:property
+ * - It describes the constraints on the relationship between the NodeShape's focus node and the reachable node
  * - sh:path is required, it specifies the relationship between the two nodes
  */
 export interface PropertyShape {
     iri: string;
-    path: string;           // The predicate IRI this property constrains (required!)
-    // NOTE: will a simple string suffice to capture the sh:path ?
-    // SHACL property paths are complex, they can be:
-    // - PredicatePath w/ simple IRI: :path ex:author
-    // - InversePath w/ reverse: :path [ sh:inversePath ex:childOf ]
-    // - SequencePath w/ nesting: :path ( ex:address ex:street )
-    // - AlternativePath w/ OR: :path [ sh:alternativePath ( ex:author ex:editor )]
-    // - ZeroOrMorePath: :path ( rdf:type [ sh:zeroOrMore rdfs:subClassOf ] )
-    // - OneOrMorePath: :path ( rdf:type [ sh:oneOrMore ex:knows ] )
-    // - ZeroOrOnePath: :path ( rdf:type [ sh:zeroOrOne ex:spouse ] )
-    pathLocalName: string;  // Local name for display (e.g., "headline" from schema:headline) (see getLocalName)
+    path: PropertyPath;     // The property path this shape constrains (required!)
+    pathLocalName: string;  // Local name for display (e.g., "headline" or "^sender") (see getPathLocalName)
     datatype?: string;      // XSD datatype if specified
     nodeKind?: string;      // sh:IRI, sh:BlankNode, sh:Literal, etc.
     class?: string;         // sh:class constraint (e.g., schema:Person)
+    node?: string;          // sh:node constraint - IRI of a nested shape
     minCount?: number;
     maxCount?: number;
     message?: string;       // Validation message
@@ -75,14 +108,26 @@ export interface PropertyShape {
 // - Core constraints: https://www.w3.org/TR/shacl12-core/#core-components
 
 /**
- * Parsed node shape with target class and properties
-*/
+ * Parsed node shape with target specification and properties
+ * 
+ * A shape can target either:
+ * - sh:targetClass: all instances of an rdf:type
+ * - sh:targetNode: a specific named resource
+ * 
+ * At least one of targetClass or targetNode must be present.
+ * NOTE: SHACL spec has a couple more ways to target a focus node for a shape: 
+ * - sh:targetSubjectsOf: all subjects using this predicate
+ * - sh:targetObjectsOf: all objects using this predicate
+ * - implicitly when the NodeShape is also a rdfs:Class
+ */
 export interface NodeShape {
     iri: string;
     label?: string;
     comment?: string;
-    targetClass: string; // The rdf:type this shape targets (required!)
-    targetClassLocalName: string; // this is now based off the URI, not the rdf:label of the target class (see getLocalName)
+    // Target specification (at least one required)
+    targetClass?: string;        // The rdf:type this shape targets (sh:targetClass)
+    targetNode?: string;         // A specific node IRI this shape targets (sh:targetNode)
+    targetLocalName: string;     // Local name of the target for display (from either targetClass or targetNode)
     // NOTE: there are multiple ways to target a focus node for a shape
     // sh:targetNode, sh:targetClass, sh:targetSubjectsOf, sh:targetObjectsOf, and implicitly when the NodeShape is also a rdfs:Class
     properties: PropertyShape[];
@@ -168,30 +213,76 @@ export interface NodeShape {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
+ * Parse a SHACL property path from the store
+ * 
+ * Handles:
+ * - Simple predicate paths: sh:path schema:name → { type: 'Predicate', iri: 'schema:name' }
+ * - Inverse paths: sh:path [ sh:inversePath schema:sender ] → { type: 'Inverse', path: { type: 'Predicate', iri: 'schema:sender' } }
+ * 
+ * @param store - RDF store to query
+ * @param pathTerm - The term representing the path (NamedNode for simple paths, BlankNode for complex paths)
+ * @returns PropertyPath or null if invalid
+ */
+function parsePropertyPath(store: RdfStore, pathTerm: Term): PropertyPath | null {
+    // Simple predicate path: sh:path is a NamedNode IRI
+    if (pathTerm.termType === 'NamedNode') {
+        return { type: 'Predicate', iri: pathTerm.value };
+    }
+    
+    // Complex path: sh:path is a BlankNode containing path modifiers
+    if (pathTerm.termType === 'BlankNode') {
+        // Check for inverse path: [ sh:inversePath <predicate> ]
+        const inversePath = store.getValue(pathTerm as BlankNode, SH.inversePath);
+        if (inversePath) {
+            const innerPath = parsePropertyPath(store, inversePath);
+            if (innerPath) {
+                return { type: 'Inverse', path: innerPath };
+            }
+        }
+        
+        // TODO: Add support for other path types (sequence, alternative, etc.)
+        console.warn(`[SHACL] Unsupported complex property path: ${pathTerm.value}`);
+        return null;
+    }
+    
+    console.warn(`[SHACL] Invalid path term type: ${pathTerm.termType}`);
+    return null;
+}
+
+/**
  * Parse a single PropertyShape from the store
  * Accepts both NamedNode (external reference) and BlankNode (inline definition)
  */
 function parsePropertyShape(store: RdfStore, shapeNode: SubjectNode): PropertyShape | null {
-    const path = store.getValue(shapeNode, SH.path);
-    if (!path) {
+    const pathTerm = store.getValue(shapeNode, SH.path);
+    if (!pathTerm) {
         console.warn(`[SHACL] PropertyShape ${shapeNode.value} has no sh:path`);
+        return null;
+    }
+
+    // Parse the property path (handles simple and complex paths)
+    const path = parsePropertyPath(store, pathTerm);
+    if (!path) {
+        console.warn(`[SHACL] PropertyShape ${shapeNode.value} has invalid sh:path`);
         return null;
     }
 
     const datatype = store.getValue(shapeNode, SH.datatype);
     const nodeKind = store.getValue(shapeNode, SH.nodeKind);
     const shClass = store.getValue(shapeNode, SH.class);
+    const shNode = store.getValue(shapeNode, SH.node);
     const minCount = store.getValue(shapeNode, SH.minCount);
     const maxCount = store.getValue(shapeNode, SH.maxCount);
     const message = store.getValue(shapeNode, SH.message);
 
     return {
         iri: shapeNode.value,
-        path: path.value,
-        pathLocalName: getLocalName(path.value),
+        path,
+        pathLocalName: getPathLocalName(path),
         datatype: datatype?.value,
         nodeKind: nodeKind?.value,
         class: shClass?.value,
+        node: shNode?.value,
         minCount: minCount ? parseInt(minCount.value, 10) : undefined,
         maxCount: maxCount ? parseInt(maxCount.value, 10) : undefined,
         message: message?.value,
@@ -201,13 +292,22 @@ function parsePropertyShape(store: RdfStore, shapeNode: SubjectNode): PropertySh
 /**
  * Parse a NodeShape and its property shapes from the store
  * Accepts both NamedNode and BlankNode for the shape itself
+ * 
+ * Supports both sh:targetClass (instance-based targeting) and sh:targetNode (specific node targeting)
  */
 function parseNodeShape(store: RdfStore, shapeNode: SubjectNode): NodeShape | null {
     const targetClass = store.getValue(shapeNode, SH.targetClass);
-    if (!targetClass) {
-        console.warn(`[SHACL] NodeShape ${shapeNode.value} has no sh:targetClass`);
+    const targetNode = store.getValue(shapeNode, SH.targetNode);
+    
+    if (!targetClass && !targetNode) {
+        console.warn(`[SHACL] NodeShape ${shapeNode.value} has neither sh:targetClass nor sh:targetNode`);
         return null;
     }
+
+    // Determine the target local name for display
+    const targetLocalName = targetClass 
+        ? getLocalName(targetClass.value)
+        : getLocalName(targetNode!.value);
 
     // Get metadata
     const label = store.getValue(shapeNode, RDFS.label);
@@ -238,8 +338,9 @@ function parseNodeShape(store: RdfStore, shapeNode: SubjectNode): NodeShape | nu
         iri: shapeNode.value,
         label: label?.value,
         comment: comment?.value,
-        targetClass: targetClass.value,
-        targetClassLocalName: getLocalName(targetClass.value),
+        targetClass: targetClass?.value,
+        targetNode: targetNode?.value,
+        targetLocalName,
         properties,
         closed: closed?.value === 'true',
         ignoredProperties,
@@ -247,13 +348,17 @@ function parseNodeShape(store: RdfStore, shapeNode: SubjectNode): NodeShape | nu
 }
 
 /****************************************************************************************
- * Registry of node shapes indexed by target class IRI
+ * Registry of node shapes indexed by target IRI (either targetClass or targetNode)
+ * 
+ * The registry uses a single Map that indexes shapes by their target:
+ * - For sh:targetClass shapes: indexed by the class IRI
+ * - For sh:targetNode shapes: indexed by the specific node IRI
  */
 export type ShapeRegistry = Map<string, NodeShape>;
 
 /**
  * Build a shape registry from all NodeShapes in the store
- * Returns a Map from targetClass IRI to NodeShape
+ * Returns a Map where keys are either targetClass IRIs or targetNode IRIs
  */
 export function buildShapeRegistry(store: RdfStore): ShapeRegistry {
     const registry: ShapeRegistry = new Map();
@@ -265,9 +370,18 @@ export function buildShapeRegistry(store: RdfStore): ShapeRegistry {
     for (const shapeNode of nodeShapes) {
         const shape = parseNodeShape(store, shapeNode);
         if (shape) {
-            registry.set(shape.targetClass, shape);
+            // Index by targetClass if present
+            if (shape.targetClass) {
+                registry.set(shape.targetClass, shape);
+            }
+            // Index by targetNode if present
+            if (shape.targetNode) {
+                registry.set(shape.targetNode, shape);
+            }
+            
             const propNames = shape.properties.map(p => p.pathLocalName).join(', ');
-            console.log(`[SHACL] ✓ ${shape.targetClassLocalName} shape: ${shape.properties.length} properties [${propNames}]`);
+            const targetType = shape.targetClass ? 'class' : 'node';
+            console.log(`[SHACL] ✓ ${shape.targetLocalName} shape (${targetType}): ${shape.properties.length} properties [${propNames}]`);
         }
     }
     
@@ -287,20 +401,20 @@ export function getShapeForType(registry: ShapeRegistry, typeIRI: string): NodeS
  */
 export function getDisplayProperties(shape: NodeShape): PropertyShape[] {
     // Filter out coordinate properties and other non-display properties
-    const excludedPaths = new Set([
+    const excludedPathIRIs = new Set([
         `${PREFIXES.rxyz}x`,
         `${PREFIXES.rxyz}y`,
     ]);
     
-    return shape.properties.filter(prop => !excludedPaths.has(prop.path));
+    return shape.properties.filter(prop => !excludedPathIRIs.has(getPathIRI(prop.path)));
 }
 
 /**
  * Get coordinate properties from a shape
  */
 export function getCoordinateProperties(shape: NodeShape): { x?: PropertyShape; y?: PropertyShape } {
-    const xProp = shape.properties.find(p => p.path === `${PREFIXES.rxyz}x`);
-    const yProp = shape.properties.find(p => p.path === `${PREFIXES.rxyz}y`);
+    const xProp = shape.properties.find(p => getPathIRI(p.path) === `${PREFIXES.rxyz}x`);
+    const yProp = shape.properties.find(p => getPathIRI(p.path) === `${PREFIXES.rxyz}y`);
     return { x: xProp, y: yProp };
 }
 

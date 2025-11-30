@@ -26,7 +26,6 @@ rxyz:WelcomeNav a schema:SiteNavigationElement ;
     schema:name "Welcome" ;
     schema:description "Your entry point to robsyc's knowledge graph. Load content to explore." ;
     schema:potentialAction rxyz:SearchBlogAction, rxyz:SearchAboutAction ;
-    # schema:hasPart rxyz:MyBlog, rxyz:MyAbout ;
 .
 
 rxyz:robsyc a foaf:Agent ;
@@ -57,19 +56,19 @@ What would you like to explore?""" ;
 .
 
 rxyz:SearchBlogAction a schema:SearchAction , schema:Action ;
-    schema:name "Search Blog" ; # TODO: UI should create button with this query
+    schema:name "Blog" ; # TODO: UI should create button with this query
     schema:target rxyz:BlogShape ;
 .
 
 rxyz:SearchAboutAction a schema:SearchAction , schema:Action ;
-    schema:name "Search About" ;
+    schema:name "About" ;
     schema:target rxyz:AboutShape ;
 .
 
 rxyz:AskAgentAction a schema:AskAction , schema:Action ;
     # schema:question ... # TODO: UI should create triple with user's question as object (schema:Question w/ schema:text)
     # Sending this to backend triggers ML workflow to generate response
-    schema:name "Ask Agent" ;
+    schema:name "Ask" ;
     schema:target rxyz:AgentConversation ; # TODO: how will we model the action of sending a message to the agent? backend ML task
 .
 

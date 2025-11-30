@@ -2,9 +2,9 @@
   /**
    * NavigationNode - SiteNavigationElement Node Component
    * 
-   * Displays a navigation element with action buttons for each hasPart reference.
-   * Used as the entry point in the knowledge graph, allowing users to load
-   * additional content dynamically from the backend.
+   * Displays a navigation element with action buttons for each potentialAction.
+   * Used as the entry point in the knowledge graph, allowing users to trigger
+   * actions that may load additional content.
    */
   import { Handle, Position, type NodeProps } from '@xyflow/svelte';
   
@@ -17,12 +17,6 @@
 
   import { getLocalName } from '$lib/rdf/utils';
   import type { ShapeNodeData } from '$lib/rdf/flow-mapper';
-
-  /** Map from part IRI local names to backend graph names */
-  const IRI_TO_GRAPH: Record<string, 'home' | 'data' | 'shapes'> = {
-    'MyBlog': 'data',
-    // Add more mappings as needed
-  };
 
   /** Extended data interface with the onLoadGraph callback */
   interface NavigationNodeData extends ShapeNodeData {
@@ -43,26 +37,35 @@
   // Get the description property
   const description = $derived(nodeData.properties?.['description']?.value ?? null);
   
-  // Get hasPart references - these are the items we can load
-  const hasParts = $derived.by(() => {
-    const partProp = nodeData.properties?.['hasPart'];
-    if (!partProp) return [];
+  // Get potentialAction references - these are the actions the user can take
+  const actions = $derived.by(() => {
+    const actionProp = nodeData.properties?.['potentialAction'];
+    if (!actionProp) return [];
     
-    // Return all parts with their display names and graph mappings
-    return partProp.values.map(iri => {
+    // Extract action IRIs and derive display labels
+    // Action names are derived from the IRI local name (e.g., SearchBlogAction → Blog)
+    // TODO: we are interested in the target of the action, it will point us to the shape we want to request from the backend
+    return actionProp.values.map(iri => {
       const localName = getLocalName(iri);
-      const graphName = IRI_TO_GRAPH[localName];
+      // Extract a cleaner label: "SearchBlogAction" → "Blog", "SearchAboutAction" → "About"
+      const label = localName
+        .replace(/^Search/, '')
+        .replace(/Action$/, '');
       return {
         iri,
-        label: localName,
-        graphName,
+        label: label || localName,
       };
-    }).filter(part => part.graphName); // Only show parts we know how to load
+    });
   });
   
-  function handleLoadGraph(graphName: 'home' | 'data' | 'shapes') {
-    console.log(`[NavigationNode] Loading graph: ${graphName}`);
-    onLoadGraph?.(graphName);
+  /**
+   * Handle action button click
+   * For now, logs the action IRI to console. Backend integration will be added later.
+   */
+  function handleActionClick(actionIRI: string, actionLabel: string) {
+    console.log(`[NavigationNode] Action clicked: ${actionLabel}`);
+    console.log(`[NavigationNode] Action IRI: ${actionIRI}`);
+    // TODO: In future, resolve schema:target from the action and load that content
   }
 </script>
 
@@ -78,7 +81,7 @@
             <Compass class="h-4 w-4 text-primary" />
           </div>
           <Badge variant="outline" class="text-xs font-mono">
-            {nodeData.targetClassLocalName ?? 'Navigation'}
+            {nodeData.targetLocalName ?? 'Navigation'}
           </Badge>
         </div>
         <Item.Title class="text-lg font-semibold">{name}</Item.Title>
@@ -88,23 +91,23 @@
       </Item.Content>
     </Item.Header>
 
-    {#if hasParts.length > 0}
+    {#if actions.length > 0}
       <Separator />
       
       <Item.Content class="py-3">
         <p class="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">
           Explore
         </p>
-        <div class="flex flex-col gap-2">
-          {#each hasParts as part (part.iri)}
+        <div class="flex flex-wrap gap-2">
+          {#each actions as action (action.iri)}
             <Button 
-              variant="secondary" 
+              variant="outline" 
               size="sm" 
-              class="w-full justify-between group"
-              onclick={() => handleLoadGraph(part.graphName)}
+              class="group"
+              onclick={() => handleActionClick(action.iri, action.label)}
             >
-              <span class="font-medium">{part.label}</span>
-              <ArrowRight class="h-4 w-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+              <span class="font-medium">{action.label}</span>
+              <ArrowRight class="h-4 w-4 ml-1 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
             </Button>
           {/each}
         </div>

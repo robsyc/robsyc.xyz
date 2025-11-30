@@ -19,6 +19,7 @@
     import BlogNode from '$lib/components/flow/BlogNode.svelte';
     import ShapeNode from '$lib/components/flow/ShapeNode.svelte';
     import NavigationNode from '$lib/components/flow/NavigationNode.svelte';
+    import AgentNode from '$lib/components/flow/AgentNode.svelte';
     import { Spinner } from "$lib/components/ui/spinner/index.js";
     
     // Register node types - 'shape' as generic fallback
@@ -26,6 +27,7 @@
         shape: ShapeNode,
         blog: BlogNode,
         navigation: NavigationNode,
+        agent: AgentNode,
     };
    
     // Loading state
@@ -49,8 +51,8 @@
     });
     
     /**
-     * Load additional graph content dynamically from the backend
-     * Called when user clicks a hasPart button in NavigationNode
+     * Load additional graph content dynamically from static files
+     * Called when user clicks an action button in NavigationNode
      * 
      * Always rebuilds based on current UI state - if user deleted nodes,
      * they will be recreated from the RDF store.
@@ -63,11 +65,13 @@
         loadingMessage = 'Loading additional content...';
         
         try {
-            // Load shapes first (N3.Store deduplicates internally)
-            await rdfStore.loadFromBackend('shapes');
+            // Load shapes first if loading data (N3.Store deduplicates internally)
+            if (graphName === 'data') {
+                await rdfStore.loadFromUrl('/graphs/shapes.ttl');
+            }
             
-            // Load the requested graph data
-            await rdfStore.loadFromBackend(graphName);
+            // Load the requested graph data from static file
+            await rdfStore.loadFromUrl(`/graphs/${graphName}.ttl`);
             
             // Track CURRENT UI nodes for incremental update
             // This allows deleted nodes to be recreated
@@ -111,12 +115,13 @@
     }
     
     /**
-     * Inject the loadGraph callback into navigation node data
-     * This allows NavigationNode to trigger dynamic loading
+     * Inject the loadGraph callback into navigation and agent node data
+     * This allows these nodes to trigger dynamic loading
+     * TODO: rather than loading a static graph, we want to make a parameterizable request to the backend e.g. request BlogNodeShape and matching data
      */
     function injectCallbacks(nodeList: Node[]): Node[] {
         return nodeList.map(node => {
-            if (node.type === 'navigation') {
+            if (node.type === 'navigation' || node.type === 'agent') {
                 return {
                     ...node,
                     data: {
@@ -129,19 +134,19 @@
         });
     }
     
-    // Load initial data from backend on mount
+    // Load initial data from static file on mount
     onMount(async () => {
         try {
-            // Load home graph which contains the navigation element and its shape
+            // Load home graph from static file (contains navigation element, agent, and shapes)
             loadingMessage = 'Loading home...';
-            await rdfStore.loadFromBackend('home');
-            console.log('[App] Loaded home graph from backend');
+            await rdfStore.loadFromUrl('/graphs/home.ttl');
+            console.log('[App] Loaded home graph from static file');
             
             // Convert RDF to SvelteFlow elements using shape-driven mapping
             loadingMessage = 'Building visualization...';
             const elements = quadsToFlowElements(rdfStore);
             
-            // Inject callbacks for navigation nodes
+            // Inject callbacks for navigation and agent nodes
             nodes = injectCallbacks(elements.nodes);
             edges = elements.edges;
             shapeRegistry = elements.shapeRegistry;

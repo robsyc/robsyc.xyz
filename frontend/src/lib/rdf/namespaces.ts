@@ -11,6 +11,7 @@ export const PREFIXES = {
     schema: 'https://schema.org/',
     sh: 'http://www.w3.org/ns/shacl#',
     dash: 'http://datashapes.org/dash#',
+    foaf: 'http://xmlns.com/foaf/0.1/',
     rxyz: 'http://rosyc.xyz#',
 } as const;
 
@@ -59,6 +60,7 @@ export const SH = {
     datatype: namedNode(`${PREFIXES.sh}datatype`),
     class: namedNode(`${PREFIXES.sh}class`),
     nodeKind: namedNode(`${PREFIXES.sh}nodeKind`),
+    node: namedNode(`${PREFIXES.sh}node`), // nested shape constraint
     // Cardinality
     minCount: namedNode(`${PREFIXES.sh}minCount`),
     maxCount: namedNode(`${PREFIXES.sh}maxCount`),
@@ -70,6 +72,9 @@ export const SH = {
     description: namedNode(`${PREFIXES.sh}description`),
     order: namedNode(`${PREFIXES.sh}order`), // TODO: more with DASH!
     group: namedNode(`${PREFIXES.sh}group`), // TODO: use to build shadcn forms!
+    // Property path modifiers (for complex paths)
+    inversePath: namedNode(`${PREFIXES.sh}inversePath`),
+    alternativePath: namedNode(`${PREFIXES.sh}alternativePath`),
     // Node kinds (values for sh:nodeKind)
     IRI: namedNode(`${PREFIXES.sh}IRI`),
     BlankNode: namedNode(`${PREFIXES.sh}BlankNode`),
@@ -95,6 +100,10 @@ export const XSD = {
 export const RXYZ = {
     x: namedNode(`${PREFIXES.rxyz}x`),
     y: namedNode(`${PREFIXES.rxyz}y`),
+} as const;
+
+export const FOAF = {
+    Agent: namedNode(`${PREFIXES.foaf}Agent`),
 } as const;
 
 // Helper to create a namespaced named node

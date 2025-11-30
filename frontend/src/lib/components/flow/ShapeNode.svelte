@@ -86,7 +86,7 @@
         <div class="flex items-center gap-2 mb-1">
           <Badge variant="secondary" class="text-xs font-mono hover:underline">
             <a href={shapeData.targetClass} target="_blank">
-              {shapeData.targetClassLocalName}
+              {shapeData.targetLocalName}
             </a>
           </Badge>
         </div>
@@ -142,7 +142,7 @@
           <Dialog.Header>
             <Dialog.Title>{titleProperty}</Dialog.Title>
             <Dialog.Description>
-              <Badge variant="secondary">{shapeData.targetClassLocalName}</Badge>
+              <Badge variant="secondary">{shapeData.targetLocalName}</Badge>
               <code class="text-xs bg-muted px-1 py-0.5 rounded ml-2">{shortenIRI(iri)}</code>
             </Dialog.Description>
           </Dialog.Header>

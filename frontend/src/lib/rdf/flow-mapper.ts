@@ -15,6 +15,8 @@ import {
     type ShapeRegistry, 
     type NodeShape,
     type PropertyShape,
+    type PropertyPath,
+    getPathIRI,
 } from './shacl-parser';
 import { 
     getLocalName, 
@@ -43,8 +45,9 @@ export interface ShapeNodeData {
     iri: string;
     shapeIRI: string;
     shapeLabel?: string;
-    targetClass: string;
-    targetClassLocalName: string;
+    targetClass?: string;        // Set if shape uses sh:targetClass
+    targetNode?: string;         // Set if shape uses sh:targetNode
+    targetLocalName: string;     // Display name from either targetClass or targetNode
     // Dynamic properties extracted from shape - keyed by property path local name
     properties: Record<string, PropertyValue>;
 }
@@ -53,13 +56,15 @@ export interface ShapeNodeData {
  * A property value extracted from RDF
  */
 export interface PropertyValue {
-    path: string;           // Full predicate IRI
-    localName: string;      // Local name for display
+    path: PropertyPath;     // The property path (can be inverse)
+    pathIRI: string;        // The innermost predicate IRI
+    localName: string;      // Local name for display (e.g., "name" or "^sender")
     values: string[];       // All values (as strings)
     value: string;          // First value (convenience)
     datatype?: string;      // XSD datatype if known
     isMultiValued: boolean;
     isRequired: boolean;
+    isInverse: boolean;     // True if this is an inverse path
 }
 
 /**
@@ -97,26 +102,57 @@ function getPosition(store: RdfStore, subject: SubjectNode): { x: number; y: num
  */
 
 /**
+ * Extract values from the store following a property path
+ * Handles both forward paths (subject -> predicate -> object) and
+ * inverse paths (object <- predicate <- subject)
+ * 
+ * @param store - RDF store to query
+ * @param subject - The focus node to extract values from
+ * @param path - The property path to follow
+ * @returns Array of term values as strings
+ */
+function extractPathValues(store: RdfStore, subject: SubjectNode, path: PropertyPath): string[] {
+    switch (path.type) {
+        case 'Predicate': {
+            // Forward path: find objects where subject has this predicate
+            const pathNode = namedNode(path.iri);
+            const terms = store.getValues(subject, pathNode);
+            return terms.map(t => t.value);
+        }
+        case 'Inverse': {
+            // Inverse path: find subjects that point TO our subject via the inner predicate
+            // Query: ?s innerPredicate subject → return all ?s values
+            const innerIRI = getPathIRI(path.path);
+            const pathNode = namedNode(innerIRI);
+            const quads = store.getQuads(null, pathNode, subject, null);
+            return quads.map(q => q.subject.value);
+        }
+    }
+}
+
+/**
  * Extract a PropertyValue from the store based on a PropertyShape
  * Accepts both NamedNode and BlankNode subjects
+ * Supports both forward and inverse property paths
  */
 function extractPropertyValue(
     store: RdfStore, 
     subject: SubjectNode, 
     propShape: PropertyShape
 ): PropertyValue {
-    const pathNode = namedNode(propShape.path);
-    const terms = store.getValues(subject, pathNode);
-    const values = terms.map(t => t.value);
+    const values = extractPathValues(store, subject, propShape.path);
+    const isInverse = propShape.path.type === 'Inverse';
     
     return {
         path: propShape.path,
+        pathIRI: getPathIRI(propShape.path),
         localName: propShape.pathLocalName,
         values,
         value: values[0] ?? '',
         datatype: propShape.datatype,
         isMultiValued: propShape.maxCount === undefined || propShape.maxCount > 1,
         isRequired: (propShape.minCount ?? 0) >= 1,
+        isInverse,
     };
 }
 
@@ -142,7 +178,8 @@ function extractShapeData(
         shapeIRI: shape.iri,
         shapeLabel: shape.label,
         targetClass: shape.targetClass,
-        targetClassLocalName: shape.targetClassLocalName,
+        targetNode: shape.targetNode,
+        targetLocalName: shape.targetLocalName,
         properties,
     };
 }
@@ -173,23 +210,25 @@ function shapeDataToBlogData(shapeData: ShapeNodeData): BlogNodeData {
  */
 
 /**
- * Map from target class local name to SvelteFlow node type
+ * Map from target local name (class or node) to SvelteFlow node type
  * Used to select which component renders the node
  */
 const NODE_TYPE_MAP: Record<string, string> = {
     'BlogPosting': 'blog',
     'SiteNavigationElement': 'navigation',
+    'WelcomeNav': 'navigation',      // sh:targetNode for navigation
+    'robsyc': 'agent',               // sh:targetNode for the agent
     // Future node types:
     // 'Person': 'person',
     // 'Project': 'project',
 };
 
 /**
- * Get the SvelteFlow node type for a shape's target class
+ * Get the SvelteFlow node type for a shape's target
  * Falls back to 'shape' for generic shape-based rendering
  */
 function getNodeTypeForShape(shape: NodeShape): string {
-    return NODE_TYPE_MAP[shape.targetClassLocalName] ?? 'shape';
+    return NODE_TYPE_MAP[shape.targetLocalName] ?? 'shape';
 }
 
 /****************************************************************************************
@@ -242,11 +281,30 @@ export function quadsToFlowElements(
     // Map from node ID to the original subject term (for edge creation)
     const subjectMap = new Map<string, SubjectNode>();
     
-    // For each shape, find instances of its target class and create nodes
+    // Track shapes we've processed to avoid duplicates (same shape can be indexed by both targetClass and targetNode)
+    const processedShapeIRIs = new Set<string>();
+    
+    // For each shape, find instances and create nodes
+    // Supports both sh:targetClass (instance-based) and sh:targetNode (specific node)
     // 1st forward pass: NODES
-    for (const [targetClassIRI, shape] of shapeRegistry) {
-        const subjects = dataStore.getResourcesByType(targetClassIRI);
+    for (const [, shape] of shapeRegistry) {
+        // Skip if we've already processed this shape (avoid duplicates)
+        if (processedShapeIRIs.has(shape.iri)) {
+            continue;
+        }
+        processedShapeIRIs.add(shape.iri);
+        
         const nodeType = getNodeTypeForShape(shape);
+        let subjects: SubjectNode[] = [];
+        
+        // Find subjects based on target type
+        if (shape.targetClass) {
+            // sh:targetClass: find all instances of the class
+            subjects = dataStore.getResourcesByType(shape.targetClass);
+        } else if (shape.targetNode) {
+            // sh:targetNode: target a specific named node directly
+            subjects = [namedNode(shape.targetNode)];
+        }
         
         let newCount = 0;
         for (const subject of subjects) {
@@ -287,7 +345,7 @@ export function quadsToFlowElements(
         }
         
         if (newCount > 0) {
-            console.log(`[FlowMapper] Created ${newCount} new ${shape.targetClassLocalName} node(s) → nodeType: "${nodeType}"`);
+            console.log(`[FlowMapper] Created ${newCount} new ${shape.targetLocalName} node(s) → nodeType: "${nodeType}"`);
         }
     }
     
