@@ -1,8 +1,16 @@
 import { Store, Parser, Writer, DataFactory, Reasoner } from 'n3';
 import type { Quad, NamedNode, BlankNode, Term, Quad_Subject, Quad_Predicate, Quad_Object, Quad_Graph } from 'n3';
 import SHACLValidator from 'rdf-validate-shacl'
-import { RDF, PREFIXES } from '$lib/rdf/namespaces';
 import { fetchGraph, type GraphName, type FetchGraphOptions } from '$lib/rdf/api';
+import { 
+    ClownfaceStore, 
+    createClownfaceStore, 
+    ns,
+    PREFIXES,
+    type GraphPointer,
+    type MultiPointer,
+    type AnyPointer,
+} from '$lib/rdf/clownface-store';
 
 // N3.DataFactory will give you the factory functions to create triples and quads
 // http://rdf.js.org/#datafactory-interface
@@ -27,6 +35,9 @@ export class RdfStore {
     // If you are using multiple stores, you can reduce memory consumption by allowing them to share an entity index
     #store = new Store();
     
+    // Clownface wrapper for fluent graph traversal
+    #clownface: ClownfaceStore;
+    
     // Reactive version counter - increment to trigger re-derivation
     version = $state(0);
     
@@ -40,12 +51,59 @@ export class RdfStore {
     // Node.js streams: http://nodejs.org/api/stream.html
     // RDF.js sink: http://rdf.js.org/#sink-interface
 
+    constructor() {
+        this.#clownface = createClownfaceStore(this.#store);
+    }
+
 
     /**
      * Get the underlying N3 store (for advanced queries)
      */
     get store(): Store {
         return this.#store;
+    }
+
+    /**
+     * Get the Clownface store wrapper for fluent graph traversal
+     * 
+     * @example
+     * // Use Clownface for elegant graph queries
+     * rdfStore.cf.byType(ns.schema('BlogPosting'))
+     *   .out(ns.schema('headline'))
+     *   .values
+     */
+    get cf(): ClownfaceStore {
+        // Access version to make derived computations reactive
+        this.version;
+        return this.#clownface;
+    }
+
+    /**
+     * Create a graph pointer to a specific IRI
+     * Shorthand for cf.namedNode()
+     * 
+     * @example
+     * const agentPtr = rdfStore.pointer('http://rosyc.xyz#robsyc');
+     * const name = agentPtr.out(ns.schema('name')).value;
+     */
+    pointer(iri: string) {
+        // Access version to make derived computations reactive
+        this.version;
+        return this.#clownface.namedNode(iri);
+    }
+
+    /**
+     * Find all resources of a given rdf:type using Clownface
+     * More ergonomic alternative to getResourcesByType
+     * 
+     * @example
+     * rdfStore.byType(ns.schema('BlogPosting'))
+     *   .forEach(post => console.log(post.out(ns.schema('headline')).value))
+     */
+    byType(typeNode: NamedNode) {
+        // Access version to make derived computations reactive
+        this.version;
+        return this.#clownface.byType(typeNode);
     }
 
     /**
@@ -183,7 +241,7 @@ export class RdfStore {
      */
     getResourcesByType(typeIRI: string | NamedNode): (NamedNode | BlankNode)[] {
         const typeNode = typeof typeIRI === 'string' ? namedNode(typeIRI) : typeIRI;
-        const quads = this.#store.getQuads(null, RDF.type, typeNode, null);
+        const quads = this.#store.getQuads(null, ns.rdf('type'), typeNode, null);
         
         // Return unique subjects (NamedNodes and BlankNodes)
         const subjects = new Set<string>();
@@ -278,6 +336,7 @@ export class RdfStore {
      */
     clear(): void {
         this.#store = new Store(); // renew the store
+        this.#clownface = createClownfaceStore(this.#store); // renew clownface wrapper
         this.#loadedUrls.clear();  // clear the loaded URLs
         this.version++;  // increment the version to trigger a re-derivation
     }
@@ -285,3 +344,13 @@ export class RdfStore {
 
 // Default global store instance
 export const rdfStore = new RdfStore();
+
+// Re-export Clownface utilities for convenience
+export { ns, type GraphPointer, type MultiPointer, type AnyPointer } from '$lib/rdf/clownface-store';
+export { 
+    followPath, 
+    parsePath, 
+    isInversePath, 
+    getPathPredicateIRI,
+    extractSubgraph,
+} from '$lib/rdf/clownface-store';

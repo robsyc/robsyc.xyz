@@ -250,3 +250,24 @@ rxyz:ActionShape_question a sh:PropertyShape ;
     sh:class schema:Question ;
     sh:maxCount 1 ;
 .
+
+##############################################################################################################################################
+# Test Shape for ShapeNode component verification
+##############################################################################################################################################
+
+rxyz:TestThing a schema:Thing ;
+    rxyz:x 300 ;
+    rxyz:y 0 ;
+    schema:name "Test Resource" ;
+    schema:description "A simple test resource to verify the generic ShapeNode component works correctly." ;
+    schema:url <https://example.org/test> ;
+.
+
+rxyz:TestThingShape a sh:NodeShape ;
+    rdfs:label "Test Thing Shape" ;
+    rdfs:comment "A simple shape for testing the generic ShapeNode visualization." ;
+    sh:targetNode rxyz:TestThing ;
+    sh:property 
+        rxyz:NamePropertyShape ,
+        rxyz:DescriptionPropertyShape ;
+.

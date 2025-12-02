@@ -18,6 +18,7 @@
 		"@sveltejs/kit": "^2.49.0",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
 		"@tailwindcss/vite": "^4.1.17",
+		"@types/clownface": "^2.0.10",
 		"bits-ui": "^2.14.4",
 		"clsx": "^2.1.1",
 		"svelte": "^5.45.2",
@@ -30,9 +31,15 @@
 		"vite": "^7.2.4"
 	},
 	"dependencies": {
+		"@rdfjs/data-model": "^2.1.1",
+		"@rdfjs/dataset": "^2.0.2",
+		"@rdfjs/environment": "^1.0.0",
+		"@rdfjs/namespace": "^2.0.1",
 		"@types/n3": "^1.26.1",
 		"@types/rdf-validate-shacl": "^0.5.7",
 		"@xyflow/svelte": "^1.4.2",
+		"clownface": "^2.0.3",
+		"clownface-shacl-path": "^2.4.0",
 		"marked": "^16.4.2",
 		"mode-watcher": "^1.1.0",
 		"n3": "^1.26.0",

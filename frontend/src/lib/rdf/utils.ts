@@ -6,10 +6,8 @@
  */
 
 import type { Term } from 'n3';
-import { PREFIXES, RDFS } from './namespaces';
+import { PREFIXES, ns } from './clownface-store';
 import type { RdfStore } from '$lib/stores/rdf.svelte';
-import { DataFactory } from 'n3';
-const { namedNode } = DataFactory;
 
 /****************************************************************************************
  * IRI Utilities
@@ -156,8 +154,8 @@ export function formatTriple(
  */
 export function getPredicateLabel(predicateIRI: string, store?: RdfStore): string {
     if (store) {
-        const label = store.getValue(namedNode(predicateIRI), RDFS.label);
-        if (label) return label.value;
+        const label = store.cf.namedNode(predicateIRI).out(ns.rdfs('label')).value;
+        if (label) return label;
     }
     return getLocalName(predicateIRI);
 }

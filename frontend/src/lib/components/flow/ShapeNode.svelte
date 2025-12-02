@@ -2,7 +2,8 @@
   /**
    * ShapeNode - Generic SHACL Shape-Driven Node Component
    * 
-   * Renders any RDF resource based on its SHACL shape definition.
+   * Renders any RDF resource using Clownface GraphPointers.
+   * Dynamically extracts and displays properties from the underlying RDF data.
    * Used as a fallback when no custom node component exists for a shape's target class.
    */
   import { Handle, Position, type NodeProps } from '@xyflow/svelte';
@@ -16,63 +17,150 @@
 
   import { ExternalLink } from "@lucide/svelte";
 
-  import { shortenIRI, formatDate } from '$lib/rdf/utils';
-  import type { ShapeNodeData, PropertyValue } from '$lib/rdf/flow-mapper';
+  import { ns } from '$lib/rdf/clownface-store';
+  import type { GraphPointer } from '$lib/rdf/clownface-store';
+  import type { Term } from '@rdfjs/types';
+  import type { Store } from 'n3';
+  import { shortenIRI, formatDate, getLocalName } from '$lib/rdf/utils';
   import RdfTriplesDialog from './RdfTriplesDialog.svelte';
+
+  /** Node data containing the GraphPointer */
+  interface ShapeNodeData {
+    pointer: GraphPointer<Term, Store>;
+    iri: string;
+    targetLocalName?: string;
+    targetClass?: string;
+  }
 
   let { id, data, selected }: NodeProps = $props();
   
-  // Cast to ShapeNodeData
-  const shapeData = data as unknown as ShapeNodeData;
-  const iri = shapeData.iri || id;
+  const nodeData = data as unknown as ShapeNodeData;
+  const pointer = $derived(nodeData.pointer);
+  const iri = nodeData.iri || id;
   
-  // Filter properties for display (exclude coordinates)
+  //=============================================================================
+  // Property Extraction via Clownface
+  //=============================================================================
+
+  /** Property value representation for display */
+  interface DisplayProperty {
+    predicate: string;
+    localName: string;
+    value: string;
+    values: string[];
+    isMultiValued: boolean;
+    isLiteral: boolean;
+  }
+  
+  /** 
+   * Extract all properties from the pointer's dataset
+   * Excludes position coordinates (rxyz:x, rxyz:y) and rdf:type
+   */
   const displayProperties = $derived.by(() => {
-    const excluded = new Set(['x', 'y']);
-    return Object.entries(shapeData.properties || {})
-      .filter(([key]) => !excluded.has(key))
-      .map(([key, value]) => ({ key, ...value as PropertyValue }));
-  });
-  
-  // Get a "title" property - look for common title-like properties
-  const titleProperty = $derived.by(() => {
-    const titleKeys = ['label', 'name', 'title', 'givenName'];
-    for (const key of titleKeys) {
-      if (shapeData.properties?.[key]?.value) {
-        return shapeData.properties[key].value;
+    if (!pointer?.term) return [];
+    
+    const excluded = new Set([
+      ns.rxyz('x').value,
+      ns.rxyz('y').value,
+      ns.rdf('type').value,
+    ]);
+    
+    const dataset = pointer.dataset;
+    if (!dataset) return [];
+    
+    // Group by predicate
+    const propMap = new Map<string, DisplayProperty>();
+    
+    for (const quad of dataset.match(pointer.term, null, null, null)) {
+      const predIRI = quad.predicate.value;
+      if (excluded.has(predIRI)) continue;
+      
+      const existing = propMap.get(predIRI);
+      const valueStr = quad.object.value;
+      const isLiteral = quad.object.termType === 'Literal';
+      
+      if (existing) {
+        existing.values.push(valueStr);
+        existing.isMultiValued = true;
+      } else {
+        propMap.set(predIRI, {
+          predicate: predIRI,
+          localName: getLocalName(predIRI),
+          value: valueStr,
+          values: [valueStr],
+          isMultiValued: false,
+          isLiteral,
+        });
       }
     }
-    // Fall back to local name from IRI
+    
+    return Array.from(propMap.values());
+  });
+  
+  /** Get a title property - look for common title-like predicates */
+  const titleProperty = $derived.by(() => {
+    const titlePredicates = [
+      ns.rdfs('label'),
+      ns.schema('name'),
+      ns.schema('headline'),
+      ns.schema('title'),
+    ];
+    
+    for (const pred of titlePredicates) {
+      const value = pointer?.out(pred)?.value;
+      if (value) return value;
+    }
+    
     return shortenIRI(iri);
   });
   
-  // Get a "description" property
+  /** Get a description property */
   const descriptionProperty = $derived.by(() => {
-    const descKeys = ['comment', 'summary', 'abstract', 'description'];
-    for (const key of descKeys) {
-      if (shapeData.properties?.[key]?.value) {
-        return shapeData.properties[key].value;
-      }
+    const descPredicates = [
+      ns.rdfs('comment'),
+      ns.schema('description'),
+      ns.schema('abstract'),
+    ];
+    
+    for (const pred of descPredicates) {
+      const value = pointer?.out(pred)?.value;
+      if (value) return value;
     }
+    
     return null;
   });
   
-  // Format property value for display
-  function formatValue(prop: PropertyValue): string {
-    if (prop.datatype?.includes('dateTime') || prop.datatype?.includes('date')) {
+  /** Get the rdf:type for display */
+  const typeLocalName = $derived.by(() => {
+    const typeIRI = pointer?.out(ns.rdf('type'))?.value;
+    return typeIRI ? getLocalName(typeIRI) : nodeData.targetLocalName ?? 'Resource';
+  });
+  
+  /** Get the full type IRI for linking */
+  const typeIRI = $derived(
+    pointer?.out(ns.rdf('type'))?.value ?? nodeData.targetClass
+  );
+  
+  /** Format a property value for display */
+  function formatValue(prop: DisplayProperty): string {
+    if (prop.localName.toLowerCase().includes('date')) {
       return formatDate(prop.value);
     }
-    // Truncate long values
-    if (prop.value.length > 10) {
-      return prop.value.substring(0, 10) + '...';
+    if (prop.value.length > 15) {
+      return prop.value.substring(0, 15) + '...';
     }
     return prop.value;
   }
   
-  // Keys to exclude from property list (already shown in header)
+  /** Predicates to exclude from the property list (shown in header) */
   const excludedFromList = new Set([
-    'label', 'name', 'title', 'givenName',
-    'comment', 'summary','abstract', 'description',
+    ns.rdfs('label').value,
+    ns.schema('name').value,
+    ns.schema('headline').value,
+    ns.schema('title').value,
+    ns.rdfs('comment').value,
+    ns.schema('description').value,
+    ns.schema('abstract').value,
   ]);
 </script>
 
@@ -85,9 +173,11 @@
       <Item.Content>
         <div class="flex items-center gap-2 mb-1">
           <Badge variant="secondary" class="text-xs font-mono hover:underline">
-            <a href={shapeData.targetClass} target="_blank">
-              {shapeData.targetLocalName}
-            </a>
+            {#if typeIRI}
+              <a href={typeIRI} target="_blank">{typeLocalName}</a>
+            {:else}
+              {typeLocalName}
+            {/if}
           </Badge>
         </div>
         <Item.Title>{titleProperty}</Item.Title>
@@ -102,14 +192,14 @@
     <Separator />
       <Item.Content>
         <div class="space-y-1">
-          {#each displayProperties.slice(0, 5) as prop (prop.path)}
-            {#if prop.value && !excludedFromList.has(prop.key)}
+          {#each displayProperties.slice(0, 5) as prop (prop.predicate)}
+            {#if prop.value && !excludedFromList.has(prop.predicate)}
               <div class="flex items-baseline gap-2 text-xs">
                 <span class="text-muted-foreground font-mono shrink-0">{prop.localName}:</span>
                 {#if prop.isMultiValued && prop.values.length > 1}
                   <div class="flex flex-wrap gap-1">
                     {#each prop.values.slice(0, 2) as val, i (i)}
-                      <Badge variant="outline" class="text-xs">{val}</Badge>
+                      <Badge variant="outline" class="text-xs">{shortenIRI(val)}</Badge>
                     {/each}
                     {#if prop.values.length > 2}
                       <Badge variant="outline" class="text-xs">+{prop.values.length - 2}</Badge>
@@ -142,33 +232,35 @@
           <Dialog.Header>
             <Dialog.Title>{titleProperty}</Dialog.Title>
             <Dialog.Description>
-              <Badge variant="secondary">{shapeData.targetLocalName}</Badge>
+              <Badge variant="secondary">{typeLocalName}</Badge>
               <code class="text-xs bg-muted px-1 py-0.5 rounded ml-2">{shortenIRI(iri)}</code>
             </Dialog.Description>
           </Dialog.Header>
           
           <ScrollArea class="h-[400px] w-full">
             <div class="space-y-3 pr-4">
-              {#each displayProperties as prop (prop.path)}
+              {#each displayProperties as prop (prop.predicate)}
                 <div class="border-b pb-2">
                   <div class="flex items-center gap-2 mb-1">
                     <span class="font-medium text-sm">{prop.localName}</span>
-                    {#if prop.isRequired}
-                      <Badge variant="destructive" class="text-xs">required</Badge>
-                    {/if}
                     {#if prop.isMultiValued}
-                      <Badge variant="outline" class="text-xs">multi</Badge>
+                      <Badge variant="outline" class="text-xs">multi ({prop.values.length})</Badge>
+                    {/if}
+                    {#if !prop.isLiteral}
+                      <Badge variant="secondary" class="text-xs">ref</Badge>
                     {/if}
                   </div>
                   
                   {#if prop.isMultiValued && prop.values.length > 1}
                     <div class="flex flex-wrap gap-1">
                       {#each prop.values as val, i (i)}
-                        <Badge variant="secondary">{val}</Badge>
+                        <Badge variant="secondary">{prop.isLiteral ? val : shortenIRI(val)}</Badge>
                       {/each}
                     </div>
                   {:else if prop.value}
-                    <p class="text-sm text-muted-foreground whitespace-pre-wrap">{prop.value}</p>
+                    <p class="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {prop.isLiteral ? prop.value : shortenIRI(prop.value)}
+                    </p>
                   {:else}
                     <p class="text-sm text-muted-foreground italic">No value</p>
                   {/if}
