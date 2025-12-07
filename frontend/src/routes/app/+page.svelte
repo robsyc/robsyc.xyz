@@ -22,18 +22,15 @@
     import { rdfStore } from '$lib/stores/rdf.svelte';
     import { quadsToFlowElements } from '$lib/rdf/flow-mapper-cf';
     
-    // Node components - all use GraphPointer for data access
-    import BlogNode from '$lib/components/flow/BlogNode.svelte';
-    import ShapeNode from '$lib/components/flow/ShapeNode.svelte';
-    import NavigationNode from '$lib/components/flow/NavigationNode.svelte';
-    import AgentNode from '$lib/components/flow/AgentNode.svelte';
+    // Node components - modeling view uses generic ShapeNode
+    // TODO: down the line we could add more than just ShapeNode
+    // ShapeNode is for declarative modeling
+    // for procedural logic and workflows we should add distinct node types (~n8n)
+    import ShapeNode from '$lib/components/flow/nodes/ShapeNode.svelte';
     
-    // Register node types - 'shape' as generic fallback
+    // Register node types - modeling view always uses generic ShapeNode
     const nodeTypes = {
         shape: ShapeNode,
-        blog: BlogNode,
-        navigation: NavigationNode,
-        agent: AgentNode,
     };
    
     // State
@@ -53,78 +50,6 @@
         return 'system';
     });
     
-    /**
-     * Load additional graph content dynamically
-     * Called when user clicks an action button in NavigationNode/AgentNode
-     */
-    async function loadGraph(graphName: 'home' | 'data' | 'shapes') {
-        console.log(`[App] Loading graph: ${graphName}`);
-        isLoading = true;
-        loadingMessage = 'Loading additional content...';
-        
-        try {
-            // Load shapes first if loading data
-            if (graphName === 'data') {
-                await rdfStore.loadFromUrl('/graphs/shapes.ttl');
-            }
-            
-            await rdfStore.loadFromUrl(`/graphs/${graphName}.ttl`);
-            
-            // Track current UI state for incremental update
-            const existingNodeIds = new Set(nodes.map(n => n.id));
-            const existingEdgeIds = new Set(edges.map(e => e.id));
-            const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
-            
-            // Build nodes/edges for new resources
-            const elements = quadsToFlowElements(rdfStore, {
-                existingNodeIds,
-                existingEdgeIds,
-            });
-            
-            if (elements.nodes.length === 0 && elements.edges.length === 0) {
-                console.log(`[App] No new nodes/edges to add`);
-                return;
-            }
-            
-            // Inject callbacks and merge
-            const newNodes = injectCallbacks(elements.nodes);
-            const mergedNewNodes = newNodes.map(node => ({
-                ...node,
-                position: existingPositions.get(node.id) ?? node.position,
-            }));
-            
-            nodes = [...nodes, ...mergedNewNodes];
-            edges = [...edges, ...elements.edges];
-            
-            console.log(`[App] Added ${mergedNewNodes.length} nodes, ${elements.edges.length} edges`);
-        } catch (e) {
-            error = e instanceof Error ? e.message : 'Failed to load additional content';
-            console.error('[App] Error loading graph:', e);
-        } finally {
-            isLoading = false;
-        }
-    }
-    
-    /**
-     * Inject the loadGraph callback into navigation and agent node data
-     * This allows these nodes to trigger dynamic loading
-     * TODO: rather than loading a static graph, we want to make a parameterizable request to the backend e.g. request BlogNodeShape and matching data
-     */
-    function injectCallbacks(nodeList: Node[]): Node[] {
-        return nodeList.map(node => {
-            if (node.type === 'navigation' || node.type === 'agent') {
-                return {
-                    ...node,
-                    data: {
-                        ...node.data,
-                        onLoadGraph: loadGraph,
-                    },
-                };
-            }
-            return node;
-        });
-    }
-    
     // Load initial data on mount
     onMount(async () => {
         try {
@@ -133,9 +58,11 @@
             console.log('[App] Loaded home graph');
             
             loadingMessage = 'Building visualization...';
-            const elements = quadsToFlowElements(rdfStore);
+            const elements = quadsToFlowElements(rdfStore, {
+                nodeTypeStrategy: 'generic',
+            });
             
-            nodes = injectCallbacks(elements.nodes);
+            nodes = elements.nodes;
             edges = elements.edges;
             
             console.log(`[App] Created ${nodes.length} nodes and ${edges.length} edges`);

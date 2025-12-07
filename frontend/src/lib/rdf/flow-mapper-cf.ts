@@ -62,18 +62,12 @@ function getPosition(pointer: GraphPointer<Term, Store>): { x: number; y: number
  */
 
 /**
- * Shape targets to skip visualization (rendered inside parent nodes instead)
- * Action and Message are displayed within AgentNode and NavigationNode
- * TODO: perhaps we can encode this inside the shape itself?
- */
-const SKIP_SHAPE_TARGETS = new Set(['Action', 'Message']);
-
-/**
  * Map from shape target local name to SvelteFlow node type
  * Used as fallback when no DASH/rxyz: annotation is present
  */
 const NODE_TYPE_MAP: Record<string, string> = {
-    'BlogPosting': 'blog', // TODO: this should be updated; we want Blog node with postings underneath + pagination
+    // 'BlogPosting': 'blog', // TODO: this should be updated; we want Blog node with postings underneath + pagination
+    'Blog': 'blog',
     'SiteNavigationElement': 'navigation',
     'WelcomeNav': 'navigation',
     'robsyc': 'agent',
@@ -88,6 +82,9 @@ const NODE_TYPE_MAP: Record<string, string> = {
  * 1. Explicit DASH/rxyz: annotation (rxyz:nodeType or rxyz:componentName)
  * 2. NODE_TYPE_MAP lookup by target local name
  * 3. 'shape' fallback
+ * 
+ * TODO: we should simplify this and just choose one way to go about this...
+ * I think it would make sense to map the UINodeShape IRI to node type component name in SvelteFlow
  * 
  * @param shapePtr - Pointer to the SHACL shape
  * @param targetLocalName - Fallback: local name of target class/node
@@ -117,6 +114,14 @@ export interface FlowMapperOptions {
     existingNodeIds?: Set<string>;
     /** Set of edge IDs that already exist - skip creating these edges */
     existingEdgeIds?: Set<string>;
+    
+    // TODO: this is kind of redundant since having a UINodeShape already implies a custom node type exists...
+    /** Force all nodes to use the generic ShapeNode component */
+    nodeTypeStrategy?: 'custom' | 'generic';
+    /** Only include shapes that are typed as rxyz:UINodeShape */
+    requireUINodeShape?: boolean;
+    /** Only emit nodes whose type exists in this allowlist (e.g., registered components) */
+    allowedNodeTypes?: Set<string>;
 }
 
 /**
@@ -138,6 +143,7 @@ export function quadsToFlowElements(
 ): { nodes: Node[]; edges: Edge[] } {
     const cf = rdfStore.cf;
     const store = rdfStore.store;
+    const nodeTypeStrategy = options?.nodeTypeStrategy ?? 'custom';
     
     const nodes: Node[] = [];
     const edges: Edge[] = [];
@@ -160,8 +166,15 @@ export function quadsToFlowElements(
         processedShapeIRIs.add(shapeIRI);
         
         // Determine target
+        // TODO: would this not go faster directly on the store itself
+        // using pointer-based traversal seems overly complex for simpler operations like s p ?o
         const targetClass = shapePtr.out(ns.sh('targetClass'));
         const targetNode = shapePtr.out(ns.sh('targetNode'));
+        const isUINodeShape = shapePtr.has(ns.rdf('type'), ns.rxyz('UINodeShape')).terms.length > 0;
+        
+        if (options?.requireUINodeShape && !isUINodeShape) {
+            return;
+        }
         
         let targetIRI: string | undefined;
         let targetLocalName: string;
@@ -182,17 +195,19 @@ export function quadsToFlowElements(
             return;
         }
         
-        // Skip shapes that are rendered inside parent nodes (Action, Message)
-        if (SKIP_SHAPE_TARGETS.has(targetLocalName)) {
-            return;
-        }
-        // TODO: this is redundant here... what should we pick?
         // Check if this shape should be visualized (DASH support)
         if (!shouldVisualize(shapePtr)) {
             return; // Skip non-visualized shapes
         }
         
-        const nodeType = getNodeTypeForShape(shapePtr, targetLocalName);
+        const nodeType = nodeTypeStrategy === 'generic'
+            ? 'shape'
+            : getNodeTypeForShape(shapePtr, targetLocalName);
+
+        if (options?.allowedNodeTypes && !options.allowedNodeTypes.has(nodeType)) {
+            return;
+        }
+
         const layoutHint = getLayoutHint(shapePtr);
         let newCount = 0;
         

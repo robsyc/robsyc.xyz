@@ -52,7 +52,7 @@ Welcome to my personal knowledge graph. This is an experimental space where sema
 
 What would you like to explore?""" ;
     # TODO: UI should visualize this underneath conversation with buttons for each action
-    schema:potentialAction rxyz:SearchBlogAction, rxyz:SearchAboutAction, rxyz:AskAgentAction ;
+    # schema:potentialAction rxyz:SearchBlogAction, rxyz:SearchAboutAction, rxyz:AskAgentAction ;
 .
 
 rxyz:SearchBlogAction a schema:SearchAction , schema:Action ;
@@ -65,12 +65,12 @@ rxyz:SearchAboutAction a schema:SearchAction , schema:Action ;
     schema:target rxyz:AboutShape ;
 .
 
-rxyz:AskAgentAction a schema:AskAction , schema:Action ;
-    # schema:question ... # TODO: UI should create triple with user's question as object (schema:Question w/ schema:text)
-    # Sending this to backend triggers ML workflow to generate response
-    schema:name "Ask" ;
-    schema:target rxyz:AgentConversation ; # TODO: how will we model the action of sending a message to the agent? backend ML task
-.
+# rxyz:AskAgentAction a schema:AskAction , schema:Action ;
+#     # schema:question ... # TODO: UI should create triple with user's question as object (schema:Question w/ schema:text)
+#     # Sending this to backend triggers ML workflow to generate response
+#     schema:name "Ask" ;
+#     schema:target rxyz:AgentConversation ; # TODO: how will we model the action of sending a message to the agent? backend ML task
+# .
 
 ##############################################################################################################################################
 # Reusable Property Shapes
@@ -138,11 +138,27 @@ rxyz:PotentialActionPropertyShape a sh:PropertyShape ;
     sh:node rxyz:ActionShape ;
 .
 
+rxyz:ActionShape a sh:NodeShape ;
+    rdfs:label "Action Shape" ;
+    rdfs:comment "Validates actions that can be taken by the agent." ;
+    sh:targetClass schema:Action ;
+    sh:property 
+        rxyz:NamePropertyShape , 
+        [
+            sh:path schema:target ;
+            sh:nodeKind sh:IRI ;
+            sh:minCount 1 ;
+            sh:maxCount 1 ;
+            sh:message "Action must target a URL." ;
+            sh:node rxyz:ShapeShape ;
+        ]
+.
+
 ##############################################################################################################################################
 # Home page navigation shape
 ##############################################################################################################################################
 
-rxyz:WelcomeNavShape a sh:NodeShape ;
+rxyz:WelcomeNavShape a sh:NodeShape, rxyz:UINodeShape ;
     rdfs:label "Welcome Navigation Shape" ;
     rdfs:comment "Validates the welcome navigation element displayed on the home page." ;
     sh:targetNode rxyz:WelcomeNav ;
@@ -160,9 +176,9 @@ rxyz:WelcomeNavShape a sh:NodeShape ;
 # Agent Shape
 ##############################################################################################################################################
 
-rxyz:robsycAgentShape a sh:NodeShape ;
+rxyz:robsycAgentShape a sh:NodeShape, rxyz:UINodeShape ;
     rdfs:label "Robsyc Agent Shape" ;
-    rdfs:comment "Validates the robsyc agent node that guides users through the knowledge graph." ;
+    rdfs:comment "Validates the robsyc agent node and visualizes it as a cusom agent node." ;
     sh:targetNode rxyz:robsyc ;
     sh:property 
         rxyz:NamePropertyShape ,
@@ -220,38 +236,6 @@ rxyz:MessageShape_sender a sh:PropertyShape ;
 .
 
 ##############################################################################################################################################
-# Action Shapes
-##############################################################################################################################################
-
-rxyz:ActionShape a sh:NodeShape ;
-    rdfs:label "Action Shape" ;
-    rdfs:comment "Validates actions that can be taken by the agent." ;
-    sh:targetClass schema:Action ;
-    sh:property 
-        rxyz:NamePropertyShape , 
-        rxyz:ActionShape_target ,
-        rxyz:ActionShape_question ;
-.
-
-rxyz:ActionShape_target a sh:PropertyShape ;
-    rdfs:label "Target Shape Property" ;
-    rdfs:comment "The SHACL shape IRI defining what content to retrieve." ;
-    sh:path schema:target ;
-    sh:nodeKind sh:IRI ;
-    sh:minCount 1 ;
-    sh:maxCount 1 ;
-    sh:message "Action must target a URL." ;
-.
-
-rxyz:ActionShape_question a sh:PropertyShape ;
-    rdfs:label "AskAction Question Property" ;
-    rdfs:comment "User's question text (populated by UI when action is invoked)." ;
-    sh:path schema:question ;
-    sh:class schema:Question ;
-    sh:maxCount 1 ;
-.
-
-##############################################################################################################################################
 # Test Shape for ShapeNode component verification
 ##############################################################################################################################################
 
@@ -259,7 +243,7 @@ rxyz:TestThing a schema:Thing ;
     rxyz:x 400 ;
     rxyz:y -250 ;
     schema:name "Test Resource" ;
-    schema:description "A simple test resource to verify the generic ShapeNode component works correctly." ;
+    schema:description "A simple test resource to verify the generic ShapeNode component works correctly. This shape is not a rxyz:UINodeShape." ;
     schema:url <https://example.org/test> ;
 .
 
@@ -272,7 +256,9 @@ rxyz:TestThingShape a sh:NodeShape ;
         rxyz:DescriptionPropertyShape ;
 .
 
-##################
+##############################################################################################################################################
+# Blog Shape
+##############################################################################################################################################
 
 rxyz:MyBlog a schema:Blog ;
     rxyz:x 400 ; 
@@ -280,112 +266,26 @@ rxyz:MyBlog a schema:Blog ;
     schema:name "My Blog" ;
     schema:description "The robsyc.xyz blog! Where topics such as linked data, machine intelligence and anarchism are explored." ;
     schema:blogPost rxyz:firstBlogPost ;
+    # TODO: add potential action to fetch blog posts
+    # action should be paremeterized to allow for different blog posts to be fetched
+    # e.g. last 5, + pagination, ...
 .
 
-rxyz:firstBlogPost a schema:BlogPosting ;
-    schema:author rxyz:me ;
-    schema:headline "What am I looking at?" ;
-    schema:datePublished "2025-01-01T00:00:00"^^xsd:dateTime ;
-    schema:dateModified "2025-01-01T00:00:00"^^xsd:dateTime ;
-    schema:abstract "My very first blog post: a meta article about this website" ;
-    schema:keywords "Semantic web", "Node-based UIs" ;
-    schema:articleBody """Welcome to my revamped personal website and knowledge graph `robsyc.xyz` !
-
-The goal of this web application is three fold:
-1. To bridge traditional semantic web technologies with contemporary web development and machine learning. 
-2. To express thoughts and beliefs and to share my work in a structured machine- and human-readable way.
-3. To fuck around a bit; a playground for tinkering with shit that interests me.
-
-Expect unconventional UX, radical takes, and my occasional stab at zoomer-humour. I sincerely hope you enjoy lurking through my knowledge graph!""" ; 
-.
-
-rxyz:BlogPostingShape a sh:NodeShape ;
-    rdfs:label "BlogPosting" ;
-    rdfs:comment "Node shape for schema:BlogPosting instances - child nodes of Blog containers." ;
-    sh:targetClass schema:BlogPosting ;
-    sh:closed false ;
-    # This shape's instances are rendered inside a container, not as standalone nodes
-    rxyz:isVisualized false ;
-    rxyz:nodeType "blogPosting" ;
-    sh:property [
-        sh:path schema:headline ;
-        sh:datatype xsd:string ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:message "Blog posts must have a single headline."
-    ] , [
-        sh:path schema:author ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:nodeKind sh:IRI ;
-        sh:class schema:Person ;
-        sh:message "Author must reference a schema:Person."
-    ] , [
-        sh:path schema:datePublished ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:dateTime ;
-        sh:message "Each blog post needs datePublished (xsd:dateTime)."
-    ] , [
-        sh:path schema:abstract ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:string ;
-        sh:message "Blog posts require a single abstract/description."
-    ] , [
-        sh:path schema:keywords ;
-        sh:datatype xsd:string ;
-        sh:minCount 1 ;
-        sh:message "Provide at least one keyword string per blog post."
-    ] , [
-        sh:path schema:articleBody ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:string ;
-        sh:message "Each blog post must include its articleBody string."
-    ] ;
-.
-
-rxyz:Blog a sh:NodeShape ;
-    rdfs:label "Blog" ;
-    rdfs:comment "Node shape for schema:Blog instances - a container for BlogPostings." ;
+rxyz:BlogShape a sh:NodeShape, rxyz:UINodeShape ;
+    rdfs:label "Blog Shape" ;
+    rdfs:comment "UI node shape for schema:Blog instances." ;
     sh:targetClass schema:Blog ;
     sh:closed false ;
-    # Container visualization hints
-    rxyz:nodeType "container" ;
-    rxyz:containerProperty schema:blogPost ;  # Property path to find children
-    rxyz:childShape rxyz:BlogPostingShape ;   # Shape of child nodes
-    rxyz:childNodeType "blogPosting" ;        # SvelteFlow node type for children
-    rxyz:containerLabel "Posts" ;             # UI label for the expand button
-    sh:property [
-        sh:path schema:blogPost ;
-        sh:class schema:BlogPosting ;
-        sh:minCount 1 ;
-        sh:message "Blogs must reference at least one schema:BlogPosting." ;
-        sh:node rxyz:BlogPostingShape ;
-    ] , [
-        sh:path schema:name ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:string ;
-        sh:message "Blogs must have a name." ;
-    ] , [
-        sh:path schema:description ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:string ;
-        sh:message "Blogs must have a description." ;
-    ] , [
-        sh:path rxyz:x ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:integer ;
-        sh:message "Blog nodes must carry their x coordinate." ;
-    ] , [
-        sh:path rxyz:y ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:integer ;
-        sh:message "Blog nodes must carry their y coordinate." ;
-    ] ;
+    sh:property 
+        rxyz:NamePropertyShape ,
+        rxyz:DescriptionPropertyShape ,
+        rxyz:XPropertyShape ,
+        rxyz:YPropertyShape , 
+        [
+            sh:path schema:blogPost ;
+            sh:class schema:BlogPosting ;
+            sh:minCount 1 ;
+            sh:message "Blogs must reference at least one schema:BlogPosting." ;
+            sh:node rxyz:BlogPostingShape ;
+        ] 
 .

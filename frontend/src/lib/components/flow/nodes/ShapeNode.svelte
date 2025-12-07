@@ -22,7 +22,7 @@
   import type { Term } from '@rdfjs/types';
   import type { Store } from 'n3';
   import { shortenIRI, formatDate, getLocalName } from '$lib/rdf/utils';
-  import RdfTriplesDialog from './RdfTriplesDialog.svelte';
+  import ShapeSerializerDialog from '../utils/ShapeSerializerDialog.svelte';
 
   /** Node data containing the GraphPointer */
   interface ShapeNodeData {
@@ -66,12 +66,13 @@
     ]);
     
     const dataset = pointer.dataset;
-    if (!dataset) return [];
-    
+    const subject = pointer.term;
+    if (!dataset || !subject) return [];
+        
     // Group by predicate
     const propMap = new Map<string, DisplayProperty>();
     
-    for (const quad of dataset.match(pointer.term, null, null, null)) {
+    for (const quad of dataset.match(subject as any, null, null, null)) {
       const predIRI = quad.predicate.value;
       if (excluded.has(predIRI)) continue;
       
@@ -219,7 +220,7 @@
 
     <Item.Actions>
 
-      <RdfTriplesDialog {iri} />
+      <ShapeSerializerDialog {pointer} iri={iri} />
 
       <!-- Dialog to open the full shape details -->
       <Dialog.Root>

@@ -58,7 +58,7 @@
     
     const actionPointers = pointer.out(ns.schema('potentialAction')).toArray();
     
-    return actionPointers.map((actionPtr: ReturnType<typeof actionPointers>[number]) => {
+    return actionPointers.map((actionPtr: (typeof actionPointers)[number]) => {
       const actionIRI = actionPtr.term?.value ?? '';
       const actionName = actionPtr.out(ns.schema('name')).value ?? '';
       const target = actionPtr.out(ns.schema('target')).value ?? '';

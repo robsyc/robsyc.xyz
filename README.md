@@ -127,7 +127,7 @@ Palantir is a platform for modelling a business' workflow (and its data). It def
 
 - **Object type** of which instances are called 'objects' and is kind of like an owl:Class or sh:NodeShape. There is no explicit reasoning to it, only a vague notion of hierarchy through tags. So it is really more like skos:Concept with skos:boarder/narrower. Interestingly, object types can be tied to an ingestion scheme such as being fetched from an excelsheet or various other connectors, which means there is kind of meta-model behind object types. Object types have properties and actions...
 
-- **Property types** behaving kind of like owl:DatatypeProperty or simple predicate path sh:PropertyShape with xsd datatypes. Their is no hierachy or inference involved. Objects also have metadate kind of similar to skos:prefLabel, primary keys, ... The ingestion schemes of object types populate properties, kind of like an RML behind the class.
+- **Property types** behaving kind of like owl:DatatypeProperty or simple predicate path sh:PropertyShape with xsd datatypes. There is no hierachy or inference involved. Objects also have metadate kind of similar to skos:prefLabel, primary keys, ... The ingestion schemes of object types populate properties, kind of like an RML behind the class.
 
 - **Link types** are like owl:ObjectProperty or sh:PropertyShapes with nested node shapes. They specifically link object together. Notably, instances of links are created and given an ID so their KG is more like an LPG: re-ification is simple but constrained.
 

@@ -57,7 +57,7 @@
     const text = messagePtr.out(ns.schema('text')).value ?? '';
     const actionPointers = messagePtr.out(ns.schema('potentialAction')).toArray();
     
-    const actions = actionPointers.map((actionPtr: ReturnType<typeof actionPointers>[number]) => {
+    const actions = actionPointers.map((actionPtr: (typeof actionPointers)[number]) => {
       const actionIRI = actionPtr.term?.value ?? '';
       const label = actionPtr.out(ns.schema('name')).value ?? '';
       const target = actionPtr.out(ns.schema('target')).value ?? '';

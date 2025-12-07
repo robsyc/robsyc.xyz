@@ -16,7 +16,7 @@
   import { ChevronsRight } from "@lucide/svelte";
 
   import { marked } from 'marked';
-  import RdfTriplesDialog from './RdfTriplesDialog.svelte';
+  import ShapeSerializerDialog from '../utils/ShapeSerializerDialog.svelte';
 
   let { id, data, selected }: NodeProps = $props();
 
@@ -52,7 +52,7 @@
     </Item.Header>
 
     <Item.Actions>
-      <RdfTriplesDialog {iri} />
+      <!-- <ShapeSerializerDialog {pointer} iri={iri} /> -->
 
       <!-- Dialog to open the full blog post content -->
       <Dialog.Root>
