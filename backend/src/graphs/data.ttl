@@ -36,11 +36,11 @@ rxyz:firstBlogPost a schema:BlogPosting ;
     schema:articleBody """Welcome to my revamped personal website and knowledge graph `robsyc.xyz` !
 
 The goal of this web application is three fold:
-1. To bridge traditional semantic web technologies with contemporary web development and machine learning practices. 
-2. To express my thoughts, opinions and beliefs and to share my work in a structured machine- and human-readable way.
-3. To fuck around a bit; a playground for tinkering with shit that vaguely interest me.
+1. To bridge traditional semantic web technologies with contemporary web development and machine learning. 
+2. To express thoughts and beliefs and to share my work in a structured machine- and human-readable way.
+3. To fuck around a bit; a playground for tinkering with shit that interests me.
 
-Expect unconventional UX, radical takes, and my occasional stab at zoomer-humor. I sincerely hope you enjoy lurking through my brain!""" ; 
+Expect unconventional UX, radical takes, and my occasional stab at zoomer-humour. I sincerely hope you enjoy lurking through my knowledge graph!""" ; 
 .
 
 rxyz:shaclDrivenUI a schema:BlogPosting ;

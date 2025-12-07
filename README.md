@@ -131,4 +131,70 @@ Palantir is a platform for modelling a business' workflow (and its data). It def
 
 - **Link types** are like owl:ObjectProperty or sh:PropertyShapes with nested node shapes. They specifically link object together. Notably, instances of links are created and given an ID so their KG is more like an LPG: re-ification is simple but constrained.
 
-- **Action types** are the most interesting, they are composed of rules (what to do), parameters (what to do it with), and submission criteria (when to do it). These are the most challending to find linked data alternatives to... Perhaps some domain ontology could be of use. Declarative modeling vs. procedural logic.
+- **Action types** are the most interesting, they are composed of rules (what to do), parameters (what to do it with), and submission criteria (when to do it). These are the most challending to find linked data alternatives to... Perhaps a combination of specs; N3/SHACL/SPARQL for rules, SHACL for parameters, and PROV/SPARQL for submission criteria. Declarative modeling vs. procedural logic. Tools like the n8n workflow builder and pydantic-graph state-machine library are useful inspirations.
+
+## Side-note about SHACL-UI (part of SHACL 1.2)
+
+SHACL is a language for describing and validating RDF graphs using shapes (node shapes and property shapes). Shapes can drive validation and also UI building. Key non-validating UI hints from SHACL Core: sh:name/sh:description for labels, sh:order for ordering, sh:group for sectioning, sh:closed + sh:ignoredProperties to scope editable/displayed predicates.
+
+The SHACL 1.2 UI spec adds shui:Editor (inputs) and shui:Viewer (read-only) plus a scoring mechanism for choosing defaults. Reference: [SHACL UI 1.2](https://w3c.github.io/data-shapes/shacl12-ui/).
+
+### How this repo turns shapes into UI
+
+- Graph + path layer: `clownface-store` wraps N3 with clownface-shacl-path so we follow SHACL property paths (predicate, inverse, sequence, alternatives, zero/one/more) for view/edit.
+
+- NodeShape-to-node mapping: `flow-mapper` enumerates sh:NodeShapes and emits SvelteFlow nodes/edges. `ShapeNode.svelte` is the generic renderer.
+
+- PropertyShape to view/form field mapping: ...
+
+- Constraints (sh:minCount/sh:maxCount, sh:datatype/sh:nodeKind/sh:class/sh:in, sh:closed/sh:ignoredProperties) drive requiredness, multiplicity, visibility, and widget choice. Client-side `rdf-validate-shacl` keeps edits aligned with shapes; form submit can serialize back to triples and post via SPARQL UPDATE.
+
+- Serialization: `ShapeSerializerDialog` + `serializeSelectedNodes` already extract RDF for view; inverse direction will reuse shape traversal.
+
+### Widget catalogue SHACL-UI → shadcn pairings
+
+- **Editors**
+  - AutoCompleteEditor → Combobox (IRI search)
+  - BlankNodeEditor → inline new blank node + nested mini-form
+  - BooleanSelectEditor → Switch/Select
+  - DatePickerEditor/DateTimePickerEditor → date/time pickers
+  - DetailsEditor → nested form with breadcrumbs
+  - EnumSelectEditor → Select/Combobox over sh:in
+  - InstancesSelectEditor → Select/Combobox over sh:class instances
+  - RichTextEditor → Textarea + toolbar/markdown
+  - SubClassEditor → Combobox/tree over subclass hierarchy
+  - TextAreaEditor → Textarea
+  - TextAreaWithLangEditor → Textarea + lang chip (rdf:langString)
+  - TextFieldEditor → Input
+  - TextFieldWithLangEditor → Input + lang chip
+  - URIEditor → Input with URL validation/preview
+
+- **Viewers**
+  - BlankNodeViewer → compact nested summary
+  - DetailsViewer → expanded inline view
+  - HTMLViewer → safe-rendered HTML/markdown
+  - HyperlinkViewer/URIViewer → link
+  - ImageViewer → inline image
+  - LabelViewer → label/hyperlink via rdfs:label/skos:prefLabel
+  - LangStringViewer → text + lang badge
+  - LiteralViewer → plain text
+  - ValueTableViewer (MultiViewer) → DataTable with columns from sh:node + sh:order
+
+- **Multi vs single**: use chips/add-remove for multi editors; tables/grids for multi viewers; respect shui:MultiEditor/MultiViewer vs Single.
+
+- **Property roles**: honor `shui:propertyRole` (LabelRole, DescriptionRole, etc.) with `sh:order` precedence to pick best labels/help text.
+
+- **Property paths**: view/edit must handle predicate + inverse; support complex paths (sequence, alternative, zero/one/more) where feasible for richer traversal.
+
+### Planned extensions on top of SHACL-UI
+- Range selector (slider + min/max) for numeric ranges (sh:minInclusive/sh:maxInclusive).  
+- RadioGroup for small enums (boolean or short sh:in).  
+- Tag/Chips multi-select for unordered literal/IRI lists.  
+- File/Media picker for anyURI with MIME/type hints.  
+- Map picker for geo predicates (geo:lat/long or GeoJSON shapes).  
+- Markdown/Rich text dual-mode editor for rdf:HTML bodies.  
+- Inline diff/validation surfacing SHACL report entries near fields.
+
+Importantly, we need a clear distinction between
+- PropertyShape is just another field in the UI node (e.g. headline of a BlogPosting)
+- PropertyShape is an edge to another UI node (e.g. author of a BlogPosting or BlogPosting to Blog)

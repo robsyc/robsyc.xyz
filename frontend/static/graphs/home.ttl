@@ -29,8 +29,8 @@ rxyz:WelcomeNav a schema:SiteNavigationElement ;
 .
 
 rxyz:robsyc a foaf:Agent ;
-    rxyz:x -200 ;
-    rxyz:y 100 ;
+    rxyz:x -90 ;
+    rxyz:y 300 ;
     schema:name "robsyc" ;
     schema:image <https://avatars.githubusercontent.com/u/87700333> ;
     schema:description "Your guide through this knowledge graph." ;
@@ -256,8 +256,8 @@ rxyz:ActionShape_question a sh:PropertyShape ;
 ##############################################################################################################################################
 
 rxyz:TestThing a schema:Thing ;
-    rxyz:x 300 ;
-    rxyz:y 0 ;
+    rxyz:x 400 ;
+    rxyz:y -250 ;
     schema:name "Test Resource" ;
     schema:description "A simple test resource to verify the generic ShapeNode component works correctly." ;
     schema:url <https://example.org/test> ;
@@ -270,4 +270,122 @@ rxyz:TestThingShape a sh:NodeShape ;
     sh:property 
         rxyz:NamePropertyShape ,
         rxyz:DescriptionPropertyShape ;
+.
+
+##################
+
+rxyz:MyBlog a schema:Blog ;
+    rxyz:x 400 ; 
+    rxyz:y 300 ;
+    schema:name "My Blog" ;
+    schema:description "The robsyc.xyz blog! Where topics such as linked data, machine intelligence and anarchism are explored." ;
+    schema:blogPost rxyz:firstBlogPost ;
+.
+
+rxyz:firstBlogPost a schema:BlogPosting ;
+    schema:author rxyz:me ;
+    schema:headline "What am I looking at?" ;
+    schema:datePublished "2025-01-01T00:00:00"^^xsd:dateTime ;
+    schema:dateModified "2025-01-01T00:00:00"^^xsd:dateTime ;
+    schema:abstract "My very first blog post: a meta article about this website" ;
+    schema:keywords "Semantic web", "Node-based UIs" ;
+    schema:articleBody """Welcome to my revamped personal website and knowledge graph `robsyc.xyz` !
+
+The goal of this web application is three fold:
+1. To bridge traditional semantic web technologies with contemporary web development and machine learning. 
+2. To express thoughts and beliefs and to share my work in a structured machine- and human-readable way.
+3. To fuck around a bit; a playground for tinkering with shit that interests me.
+
+Expect unconventional UX, radical takes, and my occasional stab at zoomer-humour. I sincerely hope you enjoy lurking through my knowledge graph!""" ; 
+.
+
+rxyz:BlogPostingShape a sh:NodeShape ;
+    rdfs:label "BlogPosting" ;
+    rdfs:comment "Node shape for schema:BlogPosting instances - child nodes of Blog containers." ;
+    sh:targetClass schema:BlogPosting ;
+    sh:closed false ;
+    # This shape's instances are rendered inside a container, not as standalone nodes
+    rxyz:isVisualized false ;
+    rxyz:nodeType "blogPosting" ;
+    sh:property [
+        sh:path schema:headline ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Blog posts must have a single headline."
+    ] , [
+        sh:path schema:author ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:nodeKind sh:IRI ;
+        sh:class schema:Person ;
+        sh:message "Author must reference a schema:Person."
+    ] , [
+        sh:path schema:datePublished ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:dateTime ;
+        sh:message "Each blog post needs datePublished (xsd:dateTime)."
+    ] , [
+        sh:path schema:abstract ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Blog posts require a single abstract/description."
+    ] , [
+        sh:path schema:keywords ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message "Provide at least one keyword string per blog post."
+    ] , [
+        sh:path schema:articleBody ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Each blog post must include its articleBody string."
+    ] ;
+.
+
+rxyz:Blog a sh:NodeShape ;
+    rdfs:label "Blog" ;
+    rdfs:comment "Node shape for schema:Blog instances - a container for BlogPostings." ;
+    sh:targetClass schema:Blog ;
+    sh:closed false ;
+    # Container visualization hints
+    rxyz:nodeType "container" ;
+    rxyz:containerProperty schema:blogPost ;  # Property path to find children
+    rxyz:childShape rxyz:BlogPostingShape ;   # Shape of child nodes
+    rxyz:childNodeType "blogPosting" ;        # SvelteFlow node type for children
+    rxyz:containerLabel "Posts" ;             # UI label for the expand button
+    sh:property [
+        sh:path schema:blogPost ;
+        sh:class schema:BlogPosting ;
+        sh:minCount 1 ;
+        sh:message "Blogs must reference at least one schema:BlogPosting." ;
+        sh:node rxyz:BlogPostingShape ;
+    ] , [
+        sh:path schema:name ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Blogs must have a name." ;
+    ] , [
+        sh:path schema:description ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Blogs must have a description." ;
+    ] , [
+        sh:path rxyz:x ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Blog nodes must carry their x coordinate." ;
+    ] , [
+        sh:path rxyz:y ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:message "Blog nodes must carry their y coordinate." ;
+    ] ;
 .

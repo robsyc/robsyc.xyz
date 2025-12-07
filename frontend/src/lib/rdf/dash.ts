@@ -18,6 +18,10 @@
  * - rxyz:nodeType - Maps a shape to a SvelteFlow node component
  * - rxyz:isVisualized - Whether instances should appear as flow nodes
  * - rxyz:layoutHint - Layout hints (horizontal, vertical, cluster)
+ * 
+ * TODO: this file should be cleaned up and renamed to shacl-ui.ts
+ * We should seek to define utilities for working with SHACL-UI hints and converting them to shadcn components.
+ * Using the new SHACL1.2-ready spec instead of DASH.
  */
 
 import { ns } from './clownface-store';

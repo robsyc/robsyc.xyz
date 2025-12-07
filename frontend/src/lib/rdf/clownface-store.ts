@@ -66,6 +66,16 @@ export const ns = {
     foaf: namespace(PREFIXES.foaf),
     skos: namespace(PREFIXES.skos),
     rxyz: namespace(PREFIXES.rxyz),
+    
+    /**
+     * Create a NamedNode from a full IRI string.
+     * Useful when you have an IRI from RDF data and need to use it for traversal.
+     * 
+     * @example
+     * const propertyIri = shapePointer.out(ns.rxyz('containerProperty')).value;
+     * const predicate = ns.fromIri(propertyIri); // NamedNode for traversal
+     */
+    fromIri: (iri: string): NamedNode => namedNode(iri),
 };
 
 /****************************************************************************************
