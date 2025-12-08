@@ -8,6 +8,15 @@
  * - Real-time updates when RDF changes
  * - Easy subgraph extraction for selected nodes
  * - Better SHACL alignment
+ * 
+ * 
+ * TODO: should make a new flow-mapper.ts file that uses the rdf.svelte store directly.
+ * Should have utilities to
+ * - extract ObjectTypes and LinkTypes from the store
+ * - parse these types based on their definitions (skos:Concept/rdfs:Class/sh:NodeShape/owl:Class & rdf:Property/sh:PropertyShape/owl:ObjectProperty)
+ * - functionality to get "Properties", "Serialze", "Instances" all making use of Clownface
+ * 
+ * Should create new shadcn-mapper.ts for conversion of SHACL-UI hints to shadcn components
  */
 
 import type { Node, Edge } from '@xyflow/svelte';

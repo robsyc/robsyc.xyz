@@ -1,111 +1,68 @@
 import { Store, Parser, Writer, DataFactory, Reasoner } from 'n3';
 import type { Quad, NamedNode, BlankNode, Term, Quad_Subject, Quad_Predicate, Quad_Object, Quad_Graph } from 'n3';
+
+import clownface from 'clownface';
+import type { GraphPointer, MultiPointer, AnyPointer } from 'clownface';
+
 import SHACLValidator from 'rdf-validate-shacl'
-import { fetchGraph, type GraphName, type FetchGraphOptions } from '$lib/rdf/api';
-import { 
-    ClownfaceStore, 
-    createClownfaceStore, 
-    ns,
-    PREFIXES,
-    type GraphPointer,
-    type MultiPointer,
-    type AnyPointer,
-} from '$lib/rdf/clownface-store';
+import { findNodes, fromNode, type ShaclPropertyPath } from 'clownface-shacl-path';
+import namespace from '@rdfjs/namespace';
 
 // N3.DataFactory will give you the factory functions to create triples and quads
 // http://rdf.js.org/#datafactory-interface
 const { namedNode, literal, quad } = DataFactory;
 
-/**
+/****************************************************************************************
+ * Namespace Builders
+ * 
+ * Using @rdfjs/namespace for cleaner, type-safe namespace handling.
+ * These create factory functions that produce NamedNodes for any local name.
+ * 
+ * @example
+ * ns.schema('BlogPosting') // returns namedNode('https://schema.org/BlogPosting')
+ * ns.sh('property')        // returns namedNode('http://www.w3.org/ns/shacl#property')
+ */
+export const ns = {
+    rdf: namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
+    rdfs: namespace('http://www.w3.org/2000/01/rdf-schema#'),
+    owl: namespace('http://www.w3.org/2002/07/owl#'),
+    xsd: namespace('http://www.w3.org/2001/XMLSchema#'),
+    sh: namespace('http://www.w3.org/ns/shacl#'),
+    shui: namespace('http://www.w3.org/ns/shacl-ui#'),
+    foaf: namespace('http://xmlns.com/foaf/0.1/'),
+    skos: namespace('http://www.w3.org/2004/02/skos/core#'),
+    schema: namespace('https://schema.org/'),
+    rxyz: namespace('http://rosyc.xyz#'),
+    
+    /**
+     * Create a NamedNode from a full IRI string.
+     * Useful when you have an IRI from RDF data and need to use it for traversal.
+     * 
+     * @example
+     * const propertyIri = shapePointer.out(ns.rxyz('containerProperty')).value;
+     * const predicate = ns.fromIri(propertyIri); // NamedNode for traversal
+     */
+    fromIri: (iri: string): NamedNode => namedNode(iri),
+};
+
+/****************************************************************************************
  * Reactive RDF Store wrapper around N3.Store using Svelte 5 runes.
  * Provides methods to load, query, and manipulate RDF triples.
- *  - Reactive version counter for triggering derived computations
- *  - loadFromUrl(url) - Fetch and parse TTL from static files
- *  - loadFromBackend(graphName, options) - Fetch named graph from backend API with optional targetClass filter
- *  - loadTurtle(content) - Parse turtle strings
- *  - getResourcesByType(typeIRI) - Query resources by rdf:type
- *  - getResourceData(subject) - Get all predicates/objects for a subject
- *  - getValue/getValues - Single/multiple value helpers
- *  - toNTriples/toTurtle - Serialization methods
- *  - clear() - Clear all quads from the store
  */
 export class RdfStore {
+    // Reactive version counter - increment to trigger re-derivation
+    version = $state(0);
+
+    // Track loaded sources
+    #loadedUrls = new Set<string>();
 
     // N3.Store for in-memory triple storage
     // If you are using multiple stores, you can reduce memory consumption by allowing them to share an entity index
     #store = new Store();
-    
-    // Clownface wrapper for fluent graph traversal
-    #clownface: ClownfaceStore;
-    
-    // Reactive version counter - increment to trigger re-derivation
-    version = $state(0);
-    
-    // Track loaded sources
-    #loadedUrls = new Set<string>();
-
-    // Parser for Turtle/N-Triples/etc
-    // N3.Parser transforms Turtle, TriG, N-Triples, or N-Quads document into quads through a callback
-    // can parse Node.js streams as they grow, returning quads as soon as they're ready
-    #parser = new Parser();
-    // Node.js streams: http://nodejs.org/api/stream.html
-    // RDF.js sink: http://rdf.js.org/#sink-interface
-
-    constructor() {
-        this.#clownface = createClownfaceStore(this.#store);
-    }
-
-
-    /**
-     * Get the underlying N3 store (for advanced queries)
-     */
     get store(): Store {
         return this.#store;
     }
-
-    /**
-     * Get the Clownface store wrapper for fluent graph traversal
-     * 
-     * @example
-     * // Use Clownface for elegant graph queries
-     * rdfStore.cf.byType(ns.schema('BlogPosting'))
-     *   .out(ns.schema('headline'))
-     *   .values
-     */
-    get cf(): ClownfaceStore {
-        // Access version to make derived computations reactive
-        this.version;
-        return this.#clownface;
-    }
-
-    /**
-     * Create a graph pointer to a specific IRI
-     * Shorthand for cf.namedNode()
-     * 
-     * @example
-     * const agentPtr = rdfStore.pointer('http://rosyc.xyz#robsyc');
-     * const name = agentPtr.out(ns.schema('name')).value;
-     */
-    pointer(iri: string) {
-        // Access version to make derived computations reactive
-        this.version;
-        return this.#clownface.namedNode(iri);
-    }
-
-    /**
-     * Find all resources of a given rdf:type using Clownface
-     * More ergonomic alternative to getResourcesByType
-     * 
-     * @example
-     * rdfStore.byType(ns.schema('BlogPosting'))
-     *   .forEach(post => console.log(post.out(ns.schema('headline')).value))
-     */
-    byType(typeNode: NamedNode) {
-        // Access version to make derived computations reactive
-        this.version;
-        return this.#clownface.byType(typeNode);
-    }
-
+    
     /**
      * Get current quad count (reactive)
      */
@@ -116,86 +73,63 @@ export class RdfStore {
     }
 
     /**
-     * Load and parse Turtle content from a URL (for static files or development)
+     * Create a graph pointer:
+     * - no args -> dataset pointer
+     * - single term/IRI -> pointer
+     * - array -> multi-pointer
      */
-    async loadFromUrl(url: string): Promise<void> {
-        if (this.#loadedUrls.has(url)) {
-            console.log(`[RdfStore] Already loaded: ${url}`);
-            return;
+    pointer(termOrTerms?: string | Term | Array<string | Term>): AnyPointer<Term, Store> {
+        // Normalize the input to terms, allowing strings, Terms, and arrays thereof
+        const toTerm = (t: string | Term) => typeof t === 'string' ? namedNode(t) : t;
+        let term: Term | Term[] | undefined = undefined;
+        if (termOrTerms !== undefined) {
+            term = Array.isArray(termOrTerms) ? termOrTerms.map(toTerm) : toTerm(termOrTerms);
+        }
+        return term === undefined
+            ? clownface({ dataset: this.store }) as AnyPointer<Term, Store>
+            : clownface({ dataset: this.store, term }) as AnyPointer<Term, Store>;
+    }
+
+    /**
+     * Load RDF data from either a URL or raw text.
+     * Returns the number of new quads added.
+     */
+    async load(options: { url?: string; text?: string; baseIRI?: string; force?: boolean }): Promise<number> {
+        const { url, text, baseIRI, force } = options;
+
+        if (!url && !text) {
+            throw new Error('Provide either url or text to load RDF data');
         }
 
-        try {
-            const response = await fetch(url);
+        if (url && !force && this.#loadedUrls.has(url)) {
+            console.log(`[RdfStore] Already loaded: ${url}`);
+            return 0;
+        }
+
+        let triples: string;
+        if (text !== undefined) {
+            triples = text;
+        } else {
+            const response = await fetch(url!);
             if (!response.ok) {
                 throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
             }
-            const turtleContent = await response.text();
-            this.loadTurtle(turtleContent, url);
-            this.#loadedUrls.add(url);
-            console.log(`[RdfStore] Loaded ${url}, store now has ${this.#store.size} quads`);
-        } catch (error) {
-            console.error(`[RdfStore] Error loading ${url}:`, error);
-            throw error;
+            triples = await response.text();
         }
-    }
+        const parser = new Parser({ baseIRI: baseIRI ?? url });
 
-    /**
-     * Load a named graph from the backend API
-     * 
-     * Always fetches from the backend, but N3.Store handles deduplication internally.
-     * Returns the number of NEW quads added (0 if all quads already existed).
-     * 
-     * @param graphName - The graph to load: 'home', 'data', or 'shapes'
-     * @param options - Optional parameters including targetClass filter
-     * @returns Number of new quads added to the store
-     * 
-     * @example
-     * // Load home graph (entry point)
-     * const newQuads = await rdfStore.loadFromBackend('home');
-     * 
-     * @example
-     * // Load shapes for a specific class
-     * const newQuads = await rdfStore.loadFromBackend('shapes', { targetClass: 'schema:BlogPosting' });
-     */
-    async loadFromBackend(graphName: GraphName, options?: FetchGraphOptions): Promise<number> {
-        const logKey = options?.targetClass 
-            ? `${graphName}:${options.targetClass}`
-            : graphName;
+        const sizeBefore = this.#store.size;
+        this.#store.addQuads(parser.parse(triples));
+        const added = this.#store.size - sizeBefore;
 
-        try {
-            const sizeBefore = this.#store.size;
-            const turtleContent = await fetchGraph(graphName, options);
-            
-            // Parse and add quads - N3.Store deduplicates automatically
-            const parser = new Parser();
-            const quads = parser.parse(turtleContent);
-            this.#store.addQuads(quads);
-            
-            const newQuads = this.#store.size - sizeBefore;
-            
-            if (newQuads > 0) {
-                this.version++;
-                console.log(`[RdfStore] Loaded ${newQuads} new quads from '${logKey}', store now has ${this.#store.size} quads`);
-            } else {
-                console.log(`[RdfStore] No new quads from '${logKey}' (all ${quads.length} quads already in store)`);
-            }
-            
-            return newQuads;
-        } catch (error) {
-            console.error(`[RdfStore] Error loading '${logKey}' from backend:`, error);
-            throw error;
+        if (added > 0) {
+            this.version++;
+            if (url) this.#loadedUrls.add(url);
         }
+
+        return added;
     }
 
-    /**
-     * Parse and add Turtle string to the store
-     */
-    loadTurtle(turtleContent: string, baseIRI?: string): void {
-        const parser = new Parser({ baseIRI });
-        const quads = parser.parse(turtleContent);
-        this.#store.addQuads(quads);
-        this.version++;
-    }
 
     /**
      * Add a single quad to the store
@@ -234,95 +168,51 @@ export class RdfStore {
     }
 
     /**
-     * Get all resources (subjects) of a given rdf:type 
-     *   - fetches resources where `?resource a typeIRI`
-     *   - e.g. `?resource a schema:BlogPosting`
-     *   - includes both NamedNode and BlankNode subjects
+     * Get all resources (subjects) of a given rdf:type using the N3 store.
+     * Includes NamedNodes and BlankNodes;
      */
     getResourcesByType(typeIRI: string | NamedNode): (NamedNode | BlankNode)[] {
         const typeNode = typeof typeIRI === 'string' ? namedNode(typeIRI) : typeIRI;
-        const quads = this.#store.getQuads(null, ns.rdf('type'), typeNode, null);
-        
-        // Return unique subjects (NamedNodes and BlankNodes)
         const subjects = new Set<string>();
-        const result: (NamedNode | BlankNode)[] = [];
-        
-        for (const q of quads) {
-            const subjectValue = q.subject.value;
-            if (!subjects.has(subjectValue) && 
-                (q.subject.termType === 'NamedNode' || q.subject.termType === 'BlankNode')) {
-                subjects.add(subjectValue);
-                result.push(q.subject as NamedNode | BlankNode);
+        const results: (NamedNode | BlankNode)[] = [];
+
+        for (const q of this.#store.getQuads(null, ns.rdf('type'), typeNode, null)) {
+            if (q.subject.termType === 'NamedNode' || q.subject.termType === 'BlankNode') {
+                if (!subjects.has(q.subject.value)) {
+                    subjects.add(q.subject.value);
+                    results.push(q.subject as NamedNode | BlankNode);
+                }
             }
         }
-        
-        return result;
+
+        return results;
     }
 
     /**
-     * Get all data for a specific resource (subject)
-     * Returns a Map of predicate IRI -> array of object values
+     * Convenience: get a pointer (or multi-pointer) for all resources of a type.
      */
-    getResourceData(subjectIRI: string | NamedNode): Map<string, Term[]> {
-        const subjectNode = typeof subjectIRI === 'string' ? namedNode(subjectIRI) : subjectIRI;
-        const quads = this.#store.getQuads(subjectNode, null, null, null);
-        
-        const data = new Map<string, Term[]>();
-        for (const q of quads) {
-            const predIRI = q.predicate.value;
-            if (!data.has(predIRI)) {
-                data.set(predIRI, []);
-            }
-            data.get(predIRI)!.push(q.object);
-        }
-        
-        return data;
+    pointersByType(typeIRI: string | NamedNode) {
+        this.version; // reactive
+        return this.pointer(this.getResourcesByType(typeIRI));
     }
 
     /**
-     * Get a single value for a predicate (first match)
+     * Serialize quads using a chosen format.
+     * Defaults to Turtle with PREFIXES.
      */
-    getValue(subject: Term | string, predicate: Term | string): Term | undefined {
-        const subjectNode = typeof subject === 'string' ? namedNode(subject) : subject;
-        const predicateNode = typeof predicate === 'string' ? namedNode(predicate) : predicate;
-        const quads = this.#store.getQuads(subjectNode, predicateNode, null, null);
-        return quads[0]?.object;
-    }
+    serialize(options?: { 
+        format?: 'turtle' | 'turtle*' | 'n-triples' | 'trig' | 'trig*' | 'n-quads' ; 
+        quads?: Quad[]; 
+    }): string {
+        const format = (options?.format ?? 'turtle').toLowerCase();
+        const quadsToWrite = options?.quads ?? this.#store.getQuads(null, null, null, null);
 
-    /**
-     * Get all values for a predicate
-     */
-    getValues(subject: Term | string, predicate: Term | string): Term[] {
-        const subjectNode = typeof subject === 'string' ? namedNode(subject) : subject;
-        const predicateNode = typeof predicate === 'string' ? namedNode(predicate) : predicate;
-        const quads = this.#store.getQuads(subjectNode, predicateNode, null, null);
-        return quads.map(q => q.object);
-    }
 
-    /**
-     * Serialize quads to N-Triples format
-     */
-    toNTriples(quads?: Quad[]): string {
-        const writer = new Writer({ format: 'N-Triples' });
-        const quadsToWrite = quads ?? this.#store.getQuads(null, null, null, null);
+        // TODO: add prefixes from ns?
+        // TODO: add option to use turtle pretty print
+        const writer = new Writer( { format: format });
         writer.addQuads(quadsToWrite);
-        
-        let result = '';
-        writer.end((error, output) => {
-            if (error) throw error;
-            result = output;
-        });
-        return result;
-    }
 
-    /**
-     * Serialize quads to Turtle format
-     */
-    toTurtle(quads?: Quad[]): string {
-        const writer = new Writer({ prefixes: PREFIXES });
-        const quadsToWrite = quads ?? this.#store.getQuads(null, null, null, null);
-        writer.addQuads(quadsToWrite);
-        
         let result = '';
         writer.end((error, output) => {
             if (error) throw error;
@@ -336,7 +226,6 @@ export class RdfStore {
      */
     clear(): void {
         this.#store = new Store(); // renew the store
-        this.#clownface = createClownfaceStore(this.#store); // renew clownface wrapper
         this.#loadedUrls.clear();  // clear the loaded URLs
         this.version++;  // increment the version to trigger a re-derivation
     }
@@ -344,13 +233,3 @@ export class RdfStore {
 
 // Default global store instance
 export const rdfStore = new RdfStore();
-
-// Re-export Clownface utilities for convenience
-export { ns, type GraphPointer, type MultiPointer, type AnyPointer } from '$lib/rdf/clownface-store';
-export { 
-    followPath, 
-    parsePath, 
-    isInversePath, 
-    getPathPredicateIRI,
-    extractSubgraph,
-} from '$lib/rdf/clownface-store';

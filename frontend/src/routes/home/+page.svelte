@@ -64,10 +64,10 @@
         try {
             // Load shapes first if loading data
             if (graphName === 'data') {
-                await rdfStore.loadFromUrl('/graphs/shapes.ttl');
+                await rdfStore.load({ url: '/graphs/shapes.ttl' });
             }
             
-            await rdfStore.loadFromUrl(`/graphs/${graphName}.ttl`);
+            await rdfStore.load({ url: `/graphs/${graphName}.ttl` });
             
             // Track current UI state for incremental update
             const existingNodeIds = new Set(nodes.map(n => n.id));
@@ -131,7 +131,7 @@
     onMount(async () => {
         try {
             loadingMessage = 'Loading home...';
-            await rdfStore.loadFromUrl('/graphs/home.ttl');
+            await rdfStore.load({ url: '/graphs/home.ttl' });
             console.log('[Home] Loaded home graph');
             
             loadingMessage = 'Building visualization...';

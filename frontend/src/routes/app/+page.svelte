@@ -19,18 +19,15 @@
     import type { Node, Edge } from '@xyflow/svelte';
 
     // RDF store and Clownface-powered mapper
-    import { rdfStore } from '$lib/stores/rdf.svelte';
-    import { quadsToFlowElements } from '$lib/rdf/flow-mapper-cf';
+    // import { rdfStore } from '$lib/stores/rdf.svelte';
+    // import { quadsToFlowElements } from '$lib/rdf/flow-mapper-cf';
     
     // Node components - modeling view uses generic ShapeNode
-    // TODO: down the line we could add more than just ShapeNode
-    // ShapeNode is for declarative modeling
-    // for procedural logic and workflows we should add distinct node types (~n8n)
-    import ShapeNode from '$lib/components/flow/nodes/ShapeNode.svelte';
+    // import ShapeNode from '$lib/components/flow/nodes/ShapeNode.svelte';
     
     // Register node types - modeling view always uses generic ShapeNode
     const nodeTypes = {
-        shape: ShapeNode,
+        // shape: ShapeNode,
     };
    
     // State
@@ -53,17 +50,17 @@
     // Load initial data on mount
     onMount(async () => {
         try {
-            loadingMessage = 'Loading home...';
-            await rdfStore.loadFromUrl('/graphs/home.ttl');
-            console.log('[App] Loaded home graph');
+            // loadingMessage = 'Loading home...';
+            // await rdfStore.load({ url: '/graphs/home.ttl' });
+            // console.log('[App] Loaded home graph');
             
-            loadingMessage = 'Building visualization...';
-            const elements = quadsToFlowElements(rdfStore, {
-                nodeTypeStrategy: 'generic',
-            });
+            // loadingMessage = 'Building visualization...';
+            // const elements = quadsToFlowElements(rdfStore, {
+            //     nodeTypeStrategy: 'generic',
+            // });
             
-            nodes = elements.nodes;
-            edges = elements.edges;
+            // nodes = elements.nodes;
+            // edges = elements.edges;
             
             console.log(`[App] Created ${nodes.length} nodes and ${edges.length} edges`);
             
@@ -76,7 +73,7 @@
     });
     
     function handleNodeClick(event: { node: Node }) {
-        console.log('Node clicked:', event.node.id, event.node.type);
+        console.log('Node clicked:', event.node.id, event.node.type, event.node.data.x, event.node.data.y);
     }
 </script>
 

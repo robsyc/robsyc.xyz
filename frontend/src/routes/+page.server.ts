@@ -13,5 +13,5 @@ export const load: PageServerLoad = ({ request }) => {
 		}
 	}
 
-	throw redirect(301, '/home');
+	throw redirect(301, '/app');
 };

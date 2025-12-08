@@ -21,7 +21,7 @@
   import type { GraphPointer } from '$lib/rdf/clownface-store';
   import type { Term } from '@rdfjs/types';
   import type { Store } from 'n3';
-  import { shortenIRI, formatDate, getLocalName } from '$lib/rdf/utils';
+  import { getCompactURI, formatDate, getLocalName } from '$lib/rdf/utils';
   import ShapeSerializerDialog from '../utils/ShapeSerializerDialog.svelte';
 
   /** Node data containing the GraphPointer */
@@ -112,7 +112,7 @@
       if (value) return value;
     }
     
-    return shortenIRI(iri);
+    return getCompactURI(iri);
   });
   
   /** Get a description property */
@@ -200,7 +200,7 @@
                 {#if prop.isMultiValued && prop.values.length > 1}
                   <div class="flex flex-wrap gap-1">
                     {#each prop.values.slice(0, 2) as val, i (i)}
-                      <Badge variant="outline" class="text-xs">{shortenIRI(val)}</Badge>
+                      <Badge variant="outline" class="text-xs">{getCompactURI(val)}</Badge>
                     {/each}
                     {#if prop.values.length > 2}
                       <Badge variant="outline" class="text-xs">+{prop.values.length - 2}</Badge>
@@ -234,7 +234,7 @@
             <Dialog.Title>{titleProperty}</Dialog.Title>
             <Dialog.Description>
               <Badge variant="secondary">{typeLocalName}</Badge>
-              <code class="text-xs bg-muted px-1 py-0.5 rounded ml-2">{shortenIRI(iri)}</code>
+              <code class="text-xs bg-muted px-1 py-0.5 rounded ml-2">{getCompactURI(iri)}</code>
             </Dialog.Description>
           </Dialog.Header>
           
@@ -255,12 +255,12 @@
                   {#if prop.isMultiValued && prop.values.length > 1}
                     <div class="flex flex-wrap gap-1">
                       {#each prop.values as val, i (i)}
-                        <Badge variant="secondary">{prop.isLiteral ? val : shortenIRI(val)}</Badge>
+                        <Badge variant="secondary">{prop.isLiteral ? val : getCompactURI(val)}</Badge>
                       {/each}
                     </div>
                   {:else if prop.value}
                     <p class="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {prop.isLiteral ? prop.value : shortenIRI(prop.value)}
+                      {prop.isLiteral ? prop.value : getCompactURI(prop.value)}
                     </p>
                   {:else}
                     <p class="text-sm text-muted-foreground italic">No value</p>

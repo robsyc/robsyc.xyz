@@ -24,7 +24,7 @@
   import type { GraphPointer } from '$lib/rdf/clownface-store';
   import type { NamedNode, Term, Quad } from '@rdfjs/types';
   import type { Store } from 'n3';
-  import { shortenIRI } from '$lib/rdf/utils';
+  import { getCompactURI } from '$lib/rdf/utils';
 
   const { namedNode } = DataFactory;
 
@@ -110,7 +110,7 @@
       <Dialog.Description>
         Resource: 
         <code class="text-xs bg-muted px-1 py-0.5 rounded">
-          {shortenIRI(iri)}
+          {getCompactURI(iri)}
         </code>
         <span class="text-xs ml-1">({quadCount} triples)</span>
       </Dialog.Description>
