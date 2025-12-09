@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
   /**
    * ShapeNode - Generic SHACL Shape-Driven Node Component
    * 
@@ -22,7 +22,7 @@
   import type { Term } from '@rdfjs/types';
   import type { Store } from 'n3';
   import { getCompactURI, formatDate, getLocalName } from '$lib/rdf/utils';
-  import ShapeSerializerDialog from '../utils/ShapeSerializerDialog.svelte';
+  import ShapeSerializerDialog from '../../utils/ShapeSerializerDialog.svelte';
 
   /** Node data containing the GraphPointer */
   interface ShapeNodeData {
@@ -188,7 +188,6 @@
       </Item.Content>
     </Item.Header>
 
-    <!-- Property list (limited preview) -->
     {#if displayProperties.length > 0}
     <Separator />
       <Item.Content>
@@ -222,7 +221,6 @@
 
       <ShapeSerializerDialog {pointer} iri={iri} />
 
-      <!-- Dialog to open the full shape details -->
       <Dialog.Root>
 
         <Dialog.Trigger class={buttonVariants({ variant: "default", size: "sm" })}>
@@ -276,4 +274,4 @@
 
   <Handle type="source" position={Position.Right} />
   <Handle type="source" position={Position.Bottom} />
-</div>
+</div> -->

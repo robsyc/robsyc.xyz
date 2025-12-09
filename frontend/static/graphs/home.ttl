@@ -4,7 +4,6 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix shui: <http://www.w3.org/ns/shacl-ui#> .
-@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix rxyz: <http://rosyc.xyz#> .
 
 # These are not used, but we should create an ontology to materialize all these equivalences
@@ -16,19 +15,43 @@
 # @prefix prov: <http://www.w3.org/ns/prov#> .
 
 
-rxyz:Blog a rxyz:ObjectType ;
+rxyz:Blog a rdfs:Class, sh:NodeShape ; # equivalent to SHACL 1.2 sh:ShapeClass
     rdfs:label "Blog" ;
     rdfs:comment "A blog is a collection of blog posts typically published by a single author." ;
+    sh:property xyz:hasBlogPost ;
 .
 
-rxyz:BlogPost a rxyz:ObjectType ;
+rxyz:BlogPost a rdfs:Class, sh:NodeShape ;
     rdfs:label "Blog Post" ;
     rdfs:comment "A blog post is a piece of content that is published on a blog." ;
+    sh:property [
+        a owl:DatatypeProperty, sh:PropertyShape ;
+        sh:path rxyz:headline ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Blog posts must have a single headline." ;
+    ] , [
+        a owl:DatatypeProperty, sh:PropertyShape ;
+        sh:path rxyz:text ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Blog posts must have a single text." ;
+    ] , [
+        a owl:DatatypeProperty, sh:PropertyShape ;
+        sh:path rxyz:datePublished ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:dateTime ;
+        sh:message "Blog posts must have a single date published." ;
+    ] ;
 .
 
-rxyz:hasBlogPost a rxyz:LinkType ;
+rxyz:Blog_hasBlogPost a owl:ObjectProperty, sh:PropertyShape ;
     rdfs:label "Has Blog Post" ;
     rdfs:comment "A blog has a blog post." ;
-    rxyz:source rxyz:Blog ;
-    rxyz:sink rxyz:BlogPost ;
+    sh:path rxyz:hasBlogPost ;
+    sh:node rxyz:BlogPost ;
+    sh:minCount 1 ;
 .

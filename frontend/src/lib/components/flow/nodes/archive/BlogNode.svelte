@@ -16,7 +16,7 @@
   import { ChevronsRight } from "@lucide/svelte";
 
   import { marked } from 'marked';
-  import ShapeSerializerDialog from '../utils/ShapeSerializerDialog.svelte';
+  import ShapeSerializerDialog from '../../utils/ShapeSerializerDialog.svelte';
 
   let { id, data, selected }: NodeProps = $props();
 

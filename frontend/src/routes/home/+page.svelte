@@ -21,9 +21,9 @@
     import { quadsToFlowElements } from '$lib/rdf/flow-mapper-cf';
     
     // Custom node components for UI shapes
-    import BlogNode from '$lib/components/flow/nodes/BlogNode.svelte';
-    import NavigationNode from '$lib/components/flow/nodes/NavigationNode.svelte';
-    import AgentNode from '$lib/components/flow/nodes/AgentNode.svelte';
+    import BlogNode from '$lib/components/flow/nodes/archive/BlogNode.svelte';
+    import NavigationNode from '$lib/components/flow/nodes/archive/NavigationNode.svelte';
+    import AgentNode from '$lib/components/flow/nodes/archive/AgentNode.svelte';
     
     // Register only the custom components we want on the home view
     const nodeTypes = {
