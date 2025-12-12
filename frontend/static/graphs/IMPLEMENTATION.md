@@ -556,7 +556,7 @@ export const ns = {
   sh: namespace('http://www.w3.org/ns/shacl#'),
   skos: namespace('http://www.w3.org/2004/02/skos/core#'),
   schema: namespace('https://schema.org/'),
-  rxyz: namespace('http://robsyc.xyz/onto#'),
+  rxyz: namespace('http://robsyc.xyz/'),
   fromIri: (iri: string) => namedNode(iri),
 };
 ```

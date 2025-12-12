@@ -4,7 +4,7 @@
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
-@prefix rxyz: <http://robsyc.xyz/onto#> .
+@prefix rxyz: <http://robsyc.xyz/> .
 
 ################################################################################
 # TEST: Basic rdfs:Class (no OWL, no SHACL)

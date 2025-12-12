@@ -30,7 +30,7 @@ export const ns = {
     shui: namespace('http://www.w3.org/ns/shacl-ui#'),
     skos: namespace('http://www.w3.org/2004/02/skos/core#'),
     schema: namespace('https://schema.org/'),
-    rxyz: namespace('http://robsyc.xyz/onto#'),
+    rxyz: namespace('http://robsyc.xyz/'),
     
     /**
      * Create a NamedNode from a full IRI string.
