@@ -1,0 +1,168 @@
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rxyz: <http://robsyc.xyz/onto#> .
+
+################################################################################
+# TEST: Sample Instances
+# 
+# PURPOSE: Provide instance data for testing:
+#          - InstancesDialog data tables
+#          - SHACL validation
+#          - Instance visualization in flow
+#          - Relationship edges between instances (ObjectProperties as edges, not as nodes)
+# 
+# EXPECTED UI: InstancesDialog showing tables of instances
+#              Forms generated from SHACL shapes
+################################################################################
+
+# -----------------------------------------------------------------------------
+# Topics (hierarchical)
+# -----------------------------------------------------------------------------
+
+rxyz:TechTopic a rxyz:Topic ;
+    rdfs:label "Technology" ;
+    rdfs:comment "Technology-related topics." ;
+.
+
+rxyz:WebDevTopic a rxyz:Topic ;
+    rdfs:label "Web Development" ;
+    rdfs:comment "Web development technologies and practices." ;
+    rxyz:broader rxyz:TechTopic ; # NOTE: makes more sense to use SKOS here...
+.
+
+rxyz:SemWebTopic a rxyz:Topic ;
+    rdfs:label "Semantic Web" ;
+    rdfs:comment "Semantic Web technologies: RDF, OWL, SHACL." ;
+    rxyz:broader rxyz:WebDevTopic ;
+.
+
+rxyz:SvelteTopic a rxyz:Topic ;
+    rdfs:label "Svelte" ;
+    rdfs:comment "Svelte framework and SvelteKit." ;
+    rxyz:broader rxyz:WebDevTopic ;
+.
+
+# -----------------------------------------------------------------------------
+# Organization
+# -----------------------------------------------------------------------------
+
+rxyz:AcmeCorp a rxyz:Organization ;
+    rxyz:legalName "Acme Corporation" ;
+    rxyz:foundedDate "2010-01-15"^^xsd:date ;
+.
+
+# -----------------------------------------------------------------------------
+# Persons
+# -----------------------------------------------------------------------------
+
+rxyz:AliceSmith a rxyz:Author ;
+    rxyz:name "Alice Smith" ;
+    rxyz:email "alice@example.com" ;
+    rxyz:birthDate "1985-03-22"^^xsd:date ;
+    rxyz:biography "Alice is a software engineer and technical writer specializing in semantic web technologies." ;
+    rxyz:worksFor rxyz:AcmeCorp ;
+    rxyz:writesAbout rxyz:SemWebTopic, rxyz:SvelteTopic ;
+.
+
+rxyz:BobJones a rxyz:Person ;
+    rxyz:name "Bob Jones" ;
+    rxyz:email "bob@example.com" ;
+    rxyz:memberOf rxyz:AcmeCorp ;
+    rxyz:knows rxyz:AliceSmith ;
+.
+
+rxyz:CharlieReviewer a rxyz:Reviewer ;
+    rxyz:name "Charlie Brown" ;
+    rxyz:email "charlie@example.com" ;
+.
+
+# Family relationships for property chain testing
+rxyz:DavidSr a rxyz:Person ;
+    rxyz:name "David Smith Sr." ;
+.
+
+rxyz:DavidJr a rxyz:Person ;
+    rxyz:name "David Smith Jr." ;
+    rxyz:childOf rxyz:DavidSr ;
+.
+
+rxyz:DavidIII a rxyz:Person ;
+    rxyz:name "David Smith III" ;
+    rxyz:childOf rxyz:DavidJr ;
+.
+# Note: rxyz:grandparentOf chain: DavidSr is grandparent of DavidIII
+
+# -----------------------------------------------------------------------------
+# Blog and Posts
+# -----------------------------------------------------------------------------
+
+rxyz:TechBlog a rxyz:Blog ;
+    rxyz:title "The Tech Blog" ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:owner rxyz:AcmeCorp ;
+    rxyz:dateCreated "2020-06-01T00:00:00Z"^^xsd:dateTime ;
+.
+
+rxyz:Post1 a rxyz:BlogPost ;
+    rxyz:title "Introduction to SHACL" ;
+    rxyz:abstract "Learn the basics of SHACL for RDF data validation." ;
+    rxyz:wordCount 2500 ;
+    rxyz:dateCreated "2024-01-15T10:30:00Z"^^xsd:dateTime ;
+    rxyz:datePublished "2024-01-16T09:00:00Z"^^xsd:dateTime ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:hasAuthor rxyz:AliceSmith ;
+    rxyz:isPartOf rxyz:TechBlog ;
+    rxyz:about rxyz:SemWebTopic ;
+    rxyz:tag "SHACL", "RDF", "validation" ;
+.
+
+rxyz:Post2 a rxyz:BlogPost ;
+    rxyz:title "Building Knowledge Graphs with RDF" ;
+    rxyz:abstract "A practical guide to constructing knowledge graphs." ;
+    rxyz:wordCount 3200 ;
+    rxyz:dateCreated "2024-02-20T14:00:00Z"^^xsd:dateTime ;
+    rxyz:datePublished "2024-02-21T08:00:00Z"^^xsd:dateTime ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:hasAuthor rxyz:AliceSmith ;
+    rxyz:isPartOf rxyz:TechBlog ;
+    rxyz:about rxyz:SemWebTopic, rxyz:WebDevTopic ;
+    rxyz:tag "RDF", "knowledge graph", "semantic web" ;
+.
+
+rxyz:Post3 a rxyz:BlogPost ;
+    rxyz:title "Getting Started with SvelteFlow" ;
+    rxyz:abstract "Build interactive node-based UIs with Svelte." ;
+    rxyz:wordCount 1800 ;
+    rxyz:dateCreated "2024-03-10T11:00:00Z"^^xsd:dateTime ;
+    rxyz:datePublished "2024-03-11T08:00:00Z"^^xsd:dateTime ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:hasAuthor rxyz:AliceSmith ;
+    rxyz:isPartOf rxyz:TechBlog ;
+    rxyz:about rxyz:SvelteTopic ;
+    rxyz:tag "Svelte", "SvelteFlow", "UI" ;
+.
+
+# Link blog to posts
+rxyz:TechBlog rxyz:hasBlogPost rxyz:Post1, rxyz:Post2, rxyz:Post3 .
+
+# Author links
+rxyz:AliceSmith rxyz:authorOf rxyz:Post1, rxyz:Post2, rxyz:Post3, rxyz:TechBlog .
+
+# Reviewer reviewed content
+rxyz:CharlieReviewer rxyz:reviews rxyz:Post1 .
+rxyz:Post1 rxyz:hasReviewer rxyz:CharlieReviewer .
+
+# -----------------------------------------------------------------------------
+# Draft content (for PublishedWork restriction testing)
+# -----------------------------------------------------------------------------
+
+rxyz:DraftPost a rxyz:BlogPost ;
+    rxyz:title "Work in Progress Article" ;
+    rxyz:dateCreated "2024-04-01T10:00:00Z"^^xsd:dateTime ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:isPartOf rxyz:TechBlog ;
+    rxyz:status rxyz:StatusDraft ;
+    # Note: No datePublished - testing PublishedContentShape validation
+.

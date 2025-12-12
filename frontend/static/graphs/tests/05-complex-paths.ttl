@@ -1,0 +1,148 @@
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rxyz: <http://robsyc.xyz/onto#> .
+
+################################################################################
+# TEST: Complex SHACL Property Paths
+# 
+# PURPOSE: Test advanced sh:path expressions
+#          - Sequence paths: ( prop1 prop2 )
+#          - Alternative paths: sh:alternativePath ( prop1 prop2 )
+#          - Inverse paths: sh:inversePath
+#          - Zero-or-more: sh:zeroOrMorePath
+#          - One-or-more: sh:oneOrMorePath
+#          - Zero-or-one: sh:zeroOrOnePath
+# 
+# USES: clownface-shacl-path library for parsing
+# 
+# EXPECTED UI: Complex paths rendered in (nested) Details dialog
+#              Path visualization (e.g., "name | label" for alternatives)
+################################################################################
+
+# -----------------------------------------------------------------------------
+# 5.1 Alternative Path (sh:alternativePath)
+# Match either rxyz:name OR rdfs:label
+# -----------------------------------------------------------------------------
+
+rxyz:LabeledThingShape a sh:NodeShape ;
+    rdfs:label "Labeled Thing Shape" ;
+    rdfs:comment "Validates that things have a display label via name or rdfs:label." ;
+    sh:targetClass rxyz:Thing ;
+    sh:property [
+        sh:path [ sh:alternativePath ( rxyz:name rdfs:label ) ] ;
+        sh:name "Display Label" ;
+        sh:description "Either rxyz:name or rdfs:label must be present." ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 5.2 Sequence Path
+# Follow rxyz:creator then rxyz:name to get creator's name
+# -----------------------------------------------------------------------------
+
+rxyz:WorkWithCreatorNameShape a sh:NodeShape ;
+    rdfs:label "Work With Creator Name Shape" ;
+    rdfs:comment "Validates that works have a creator with a name." ;
+    sh:targetClass rxyz:CreativeWork ;
+    sh:property [
+        sh:path ( rxyz:creator rxyz:name ) ;
+        sh:name "Creator Name" ;
+        sh:description "The name of the creator (via sequence path)." ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 5.3 Inverse Path
+# Find things that reference this resource
+# -----------------------------------------------------------------------------
+
+rxyz:ReferencedTopicShape a sh:NodeShape ;
+    rdfs:label "Referenced Topic Shape" ;
+    rdfs:comment "Topics that are referenced by at least one work." ;
+    sh:targetClass rxyz:Topic ;
+    sh:property [
+        sh:path [ sh:inversePath rxyz:about ] ;
+        sh:name "Referenced By" ;
+        sh:description "Works that reference this topic (inverse of about)." ;
+        sh:minCount 1 ;
+        sh:node rxyz:CreativeWork ;
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 5.4 Zero-or-More Path (transitive closure)
+# Find all ancestors via broader*
+# -----------------------------------------------------------------------------
+
+rxyz:TopicWithAncestorsShape a sh:NodeShape ;
+    rdfs:label "Topic With Ancestors Shape" ;
+    rdfs:comment "Shape that validates topic hierarchies." ;
+    sh:targetClass rxyz:Topic ;
+    sh:property [
+        sh:path [ sh:zeroOrMorePath rxyz:broader ] ;
+        sh:name "All Ancestors" ;
+        sh:description "All broader topics (transitive)." ;
+        sh:node rxyz:Topic ;
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 5.5 One-or-More Path
+# At least one level of broader required
+# -----------------------------------------------------------------------------
+
+rxyz:SubTopicShape a sh:NodeShape ;
+    rdfs:label "Sub-Topic Shape" ;
+    rdfs:comment "Topics that must have at least one parent." ;
+    sh:property [
+        sh:path [ sh:oneOrMorePath rxyz:broader ] ;
+        sh:name "Has Parent Topic" ;
+        sh:description "At least one level of broader topic required." ;
+        sh:minCount 1 ;
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 5.6 Complex Combined Path
+# Alternative of two sequence paths
+# -----------------------------------------------------------------------------
+
+rxyz:FlexibleAuthorNameShape a sh:NodeShape ;
+    rdfs:label "Flexible Author Name Shape" ;
+    rdfs:comment "Find author name via hasAuthor/name OR creator/name." ;
+    sh:targetClass rxyz:CreativeWork ;
+    sh:property [
+        sh:path [
+            sh:alternativePath (
+                ( rxyz:hasAuthor rxyz:name )
+                ( rxyz:creator rxyz:name )
+            )
+        ] ;
+        sh:name "Author or Creator Name" ;
+        sh:description "Name via either author or creator path." ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 5.7 Inverse of Sequence (find person's siblings)
+# -----------------------------------------------------------------------------
+
+rxyz:PersonWithSiblingsShape a sh:NodeShape ;
+    rdfs:label "Person With Siblings Shape" ;
+    rdfs:comment "Find siblings via inverse childOf then childOf (parent's children)." ;
+    sh:targetClass rxyz:Person ;
+    sh:property [
+        sh:path ( [ sh:inversePath rxyz:childOf ] rxyz:childOf ) ;
+        sh:name "Siblings" ;
+        sh:description "Other children of this person's parents." ;
+    ] ;
+.

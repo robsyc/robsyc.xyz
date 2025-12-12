@@ -15,24 +15,22 @@ const { namedNode, literal, quad } = DataFactory;
 /****************************************************************************************
  * Namespace Builders
  * 
- * Using @rdfjs/namespace for cleaner, type-safe namespace handling.
+ * @rdfjs/namespace for clean, type-safe namespace handling.
  * These create factory functions that produce NamedNodes for any local name.
  * 
  * @example
- * ns.schema('BlogPosting') // returns namedNode('https://schema.org/BlogPosting')
  * ns.sh('property')        // returns namedNode('http://www.w3.org/ns/shacl#property')
  */
 export const ns = {
+    xsd: namespace('http://www.w3.org/2001/XMLSchema#'),
     rdf: namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
     rdfs: namespace('http://www.w3.org/2000/01/rdf-schema#'),
     owl: namespace('http://www.w3.org/2002/07/owl#'),
-    xsd: namespace('http://www.w3.org/2001/XMLSchema#'),
     sh: namespace('http://www.w3.org/ns/shacl#'),
     shui: namespace('http://www.w3.org/ns/shacl-ui#'),
-    foaf: namespace('http://xmlns.com/foaf/0.1/'),
     skos: namespace('http://www.w3.org/2004/02/skos/core#'),
     schema: namespace('https://schema.org/'),
-    rxyz: namespace('http://rosyc.xyz#'),
+    rxyz: namespace('http://robsyc.xyz/onto#'),
     
     /**
      * Create a NamedNode from a full IRI string.

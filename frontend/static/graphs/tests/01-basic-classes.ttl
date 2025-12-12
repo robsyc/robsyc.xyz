@@ -1,0 +1,42 @@
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rxyz: <http://robsyc.xyz/onto#> .
+
+################################################################################
+# TEST: Basic rdfs:Class (no OWL, no SHACL)
+# 
+# PURPOSE: Test simple class hierarchy visualization
+# EXPECTED UI: ObjectType nodes with 
+# - rdfs:Class badge only
+# - label and comment along with 3 buttons: Details, Serialize, Instances (dialogs will be rather empty)
+# - toggle buttons to view/unview hierarchy (subClass/broaders)
+################################################################################
+
+rxyz:Thing a rdfs:Class ;
+    rdfs:label "Thing" ;
+    rdfs:comment "The root class for all entities in the domain." ;
+.
+
+rxyz:Topic a rdfs:Class ;
+    rdfs:label "Topic" ;
+    rdfs:comment "A subject or theme used to categorize content." ;
+    rdfs:subClassOf rxyz:Thing ;
+.
+
+# Test: Multiple levels of subclass hierarchy
+rxyz:TechnologyTopic a rdfs:Class ;
+    rdfs:label "Technology Topic" ;
+    rdfs:comment "Topics related to technology." ;
+    rdfs:subClassOf rxyz:Topic ;
+.
+
+rxyz:WebTopic a rdfs:Class ;
+    rdfs:label "Web Topic" ;
+    rdfs:comment "Topics related to web technologies." ;
+    rdfs:subClassOf rxyz:TechnologyTopic ;
+    skos:broader rxyz:TechnologyTopic ; # Also test SKOS hierarchy
+.

@@ -1,0 +1,224 @@
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rxyz: <http://robsyc.xyz/onto#> .
+
+################################################################################
+# TEST: SHACL Shapes with PropertyShapes
+# 
+# PURPOSE: Test sh:NodeShape detection, sh:PropertyShape handling
+#          - Named PropertyShapes vs blank node PropertyShapes
+#          - Various constraint types (datatype, cardinality, pattern, etc.)
+#          - Nested shapes (sh:node vs sh:property nesting)
+#          - sh:closed, sh:order, sh:group for UI hints
+# 
+# EXPECTED UI: ObjectType nodes with 
+# - sh:NodeShape badge
+# - Details dialog with collapsible PropertyShape sections and support for nested property shapes
+# - targeting (sh:targetClass, sh:targetObjectsOf)
+################################################################################
+
+# -----------------------------------------------------------------------------
+# 2.1 sh:ShapeClass Pattern: rdfs:Class + sh:NodeShape (SHACL 1.2 equivalent)
+# -----------------------------------------------------------------------------
+
+rxyz:Person a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being who may create, review, or consume content." ;
+    rdfs:subClassOf rxyz:Thing ;
+    sh:closed false ;  # Show in Details: allows additional properties
+    sh:property
+        rxyz:Person_email,      # Named PropertyShape
+        rxyz:Person_birthDate,  # Named PropertyShape
+        # Blank node PropertyShape (inline)
+        [ a sh:PropertyShape ;
+            sh:path rxyz:name ;
+            sh:name "Name" ;
+            sh:description "The full name of the person." ;
+            sh:order 1 ;  # UI ordering hint
+            sh:datatype xsd:string ;
+            sh:minCount 1 ;
+            sh:maxCount 1 ;
+            sh:minLength 1 ;
+            sh:maxLength 200 ;
+            sh:message "Person must have a name (1-200 characters)." ;
+        ] ,
+        # Nested sh:property pattern (multi-level validation)
+        [ a sh:PropertyShape ;
+            sh:path rxyz:interest ;
+            sh:name "Interest" ;
+            sh:order 4 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:property [
+                sh:path rdfs:label ;
+                sh:datatype xsd:string ;
+                sh:minCount 1 ;
+                sh:maxCount 1 ;
+                sh:message "Each interest must have a label." ;
+            ] ;
+        ] ;
+.
+
+rxyz:Person_email a sh:PropertyShape ;
+    sh:path rxyz:email ;
+    sh:name "Email" ;
+    sh:description "Contact email address." ;
+    sh:order 2 ;
+    sh:datatype xsd:string ;
+    sh:pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
+    sh:minCount 0 ;
+    # No maxCount = unlimited emails allowed
+.
+
+rxyz:Person_birthDate a sh:PropertyShape ;
+    sh:path rxyz:birthDate ;
+    sh:name "Birth Date" ;
+    sh:description "Date of birth." ;
+    sh:order 3 ;
+    sh:datatype xsd:date ;
+    sh:maxCount 1 ;
+    sh:message "Person can have at most one birth date." ;
+.
+
+# -----------------------------------------------------------------------------
+# 2.2 Pure sh:NodeShape (not a class) - Validation-only shape
+# -----------------------------------------------------------------------------
+
+rxyz:PublishedContentShape a sh:NodeShape ;
+    rdfs:label "Published Content Shape" ;
+    rdfs:comment "Validation shape for published content. Targets CreativeWork instances." ;
+    sh:targetClass rxyz:CreativeWork ; # link from NodeShape to Class
+    sh:property [
+        sh:path rxyz:datePublished ;
+        sh:minCount 1 ;
+        sh:message "Published content must have a publication date." ;
+    ] , [
+        sh:path rxyz:creator ;
+        sh:minCount 1 ;
+        sh:message "Published content must have at least one creator." ;
+    ] ;
+.
+
+rxyz:ValidEmailShape a sh:NodeShape ; # this is a bit odd but it's possible
+    rdfs:label "Valid Email Shape" ;
+    rdfs:comment "Validates email address format." ;
+    sh:targetObjectsOf rxyz:email ;  # Exotic targeting
+    sh:datatype xsd:string ;
+    sh:pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
+.
+
+# -----------------------------------------------------------------------------
+# 2.3 sh:node Nesting Pattern (value must conform to another shape)
+# -----------------------------------------------------------------------------
+
+rxyz:Author a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Author" ;
+    rdfs:comment "A person who writes content." ;
+    rdfs:subClassOf rxyz:Person ;
+    sh:property
+        rxyz:Author_authorOf,
+        rxyz:Author_biography ;
+.
+
+rxyz:Author_authorOf a sh:PropertyShape ;
+    sh:path rxyz:authorOf ;
+    sh:name "Author Of" ;
+    sh:description "Creative works authored by this person." ;
+    sh:node rxyz:CreativeWork ;  # Values must conform to CreativeWork shape
+    sh:minCount 1 ;
+.
+
+rxyz:Author_biography a sh:PropertyShape ;
+    sh:path rxyz:biography ;
+    sh:name "Biography" ;
+    sh:datatype xsd:string ;
+    sh:maxLength 5000 ;
+.
+
+# -----------------------------------------------------------------------------
+# 2.4 Content Shape with Multiple PropertyShapes
+# -----------------------------------------------------------------------------
+
+rxyz:CreativeWork a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Creative Work" ;
+    rdfs:comment "A creative or intellectual work." ;
+    rdfs:subClassOf rxyz:Thing ;
+    sh:property 
+        [ sh:path rxyz:title ;
+          sh:name "Title" ;
+          sh:order 1 ;
+          sh:datatype xsd:string ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ;
+          sh:minLength 1 ;
+          sh:maxLength 500 ; ] ,
+        [ sh:path rxyz:dateCreated ;
+          sh:name "Date Created" ;
+          sh:order 2 ;
+          sh:datatype xsd:dateTime ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:datePublished ;
+          sh:name "Date Published" ;
+          sh:order 3 ;
+          sh:datatype xsd:dateTime ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:creator ;
+          sh:name "Creator" ;
+          sh:order 4 ;
+          sh:node rxyz:Agent ;
+          sh:minCount 1 ; ] ,
+        [ sh:path rxyz:about ;
+          sh:name "About" ;
+          sh:order 5 ;
+          sh:node rxyz:Topic ; ] ;
+.
+
+rxyz:Article a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Article" ;
+    rdfs:comment "A written composition." ;
+    rdfs:subClassOf rxyz:CreativeWork ;
+    sh:property
+        [ sh:path rxyz:wordCount ;
+          sh:name "Word Count" ;
+          sh:datatype xsd:integer ;
+          sh:minInclusive 1 ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:abstract ;
+          sh:name "Abstract" ;
+          sh:datatype xsd:string ;
+          sh:maxLength 1000 ;
+          sh:maxCount 1 ; ] ;
+.
+
+rxyz:BlogPost a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Blog Post" ;
+    rdfs:comment "An informal article published on a blog." ;
+    rdfs:subClassOf rxyz:Article ;
+    sh:property
+        [ sh:path rxyz:isPartOf ;
+          sh:name "Is Part Of" ;
+          sh:node rxyz:Blog ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:tag ;
+          sh:name "Tags" ;
+          sh:datatype xsd:string ; ] ;
+.
+
+rxyz:Blog a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Blog" ;
+    rdfs:comment "A regularly updated website with posts." ;
+    rdfs:subClassOf rxyz:CreativeWork ;
+    sh:property
+        [ sh:path rxyz:hasBlogPost ;
+          sh:name "Has Blog Post" ;
+          sh:node rxyz:BlogPost ;
+          sh:minCount 1 ; ] ,
+        [ sh:path rxyz:owner ;
+          sh:name "Owner" ;
+          sh:node rxyz:Agent ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ; ] ;
+.

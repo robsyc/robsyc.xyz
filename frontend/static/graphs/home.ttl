@@ -1,57 +1,576 @@
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix shui: <http://www.w3.org/ns/shacl-ui#> .
-@prefix rxyz: <http://rosyc.xyz#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix schema: <https://schema.org/> .
+@prefix rxyz: <http://robsyc.xyz/onto#> .
 
-# These are not used, but we should create an ontology to materialize all these equivalences
-# @prefix schema: <https://schema.org/> .
-# @prefix foaf: <http://xmlns.com/foaf/0.1/> .
-# @prefix foaf: <http://xmlns.com/foaf/0.1/> .
-# @prefix sioc: <http://rdfs.org/sioc/ns#> .
-# @prefix cito: <http://purl.org/spar/cito/> .
-# @prefix prov: <http://www.w3.org/ns/prov#> .
+# ============================================================================
+# ROBSYC.XYZ DEMO ONTOLOGY
+# 
+# This file consolidates all test data for the RDF Flow Visualization app.
+# For modular testing, see individual files in /graphs/tests/
+# 
+# Sections:
+#   1. Basic Classes (rdfs:Class only)
+#   2. SHACL Shapes (sh:NodeShape with PropertyShapes)
+#   3. OWL Classes (owl:Class with restrictions)
+#   4. Object Properties (owl:ObjectProperty)
+#   5. Sample Instances
+# ============================================================================
 
+<http://robsyc.xyz/onto#> a owl:Ontology ;
+    rdfs:label "robsyc.xyz Demo Ontology" ;
+    rdfs:comment "A comprehensive demo ontology showcasing rdfs:Class, owl:Class, sh:NodeShape, and owl:ObjectProperty patterns." ;
+    owl:versionInfo "2.0.0" ;
+.
 
-rxyz:Blog a rdfs:Class, sh:NodeShape ; # equivalent to SHACL 1.2 sh:ShapeClass
-    rdfs:label "Blog" ;
-    rdfs:comment "A blog is a collection of blog posts typically published by a single author." ;
-    sh:property xyz:hasBlogPost ;
+# ============================================================================
+# SECTION 1: BASIC CLASSES (rdfs:Class only)
+# ============================================================================
+
+rxyz:Thing a rdfs:Class ;
+    rdfs:label "Thing" ;
+    rdfs:comment "The root class for all entities in the domain." ;
+.
+
+rxyz:Topic a rdfs:Class ;
+    rdfs:label "Topic" ;
+    rdfs:comment "A subject or theme used to categorize content." ;
+    rdfs:subClassOf rxyz:Thing ;
+.
+
+rxyz:TechnologyTopic a rdfs:Class ;
+    rdfs:label "Technology Topic" ;
+    rdfs:comment "Topics related to technology." ;
+    rdfs:subClassOf rxyz:Topic ;
+.
+
+rxyz:WebTopic a rdfs:Class ;
+    rdfs:label "Web Topic" ;
+    rdfs:comment "Topics related to web technologies." ;
+    rdfs:subClassOf rxyz:TechnologyTopic ;
+    skos:broader rxyz:TechnologyTopic ;
+.
+
+# ============================================================================
+# SECTION 2: SHACL SHAPES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 2.1 Person - ShapeClass Pattern (rdfs:Class + sh:NodeShape)
+# ----------------------------------------------------------------------------
+
+rxyz:Person a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being who may create, review, or consume content." ;
+    rdfs:subClassOf rxyz:Thing ;
+    sh:closed false ;
+    sh:property
+        rxyz:Person_email,
+        rxyz:Person_birthDate,
+        [ a sh:PropertyShape ;
+            sh:path rxyz:name ;
+            sh:name "Name" ;
+            sh:description "The full name of the person." ;
+            sh:order 1 ;
+            sh:datatype xsd:string ;
+            sh:minCount 1 ;
+            sh:maxCount 1 ;
+            sh:minLength 1 ;
+            sh:maxLength 200 ;
+            sh:message "Person must have a name (1-200 characters)." ;
+        ] ,
+        [ a sh:PropertyShape ;
+            sh:path rxyz:interest ;
+            sh:name "Interest" ;
+            sh:order 4 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:property [
+                sh:path rdfs:label ;
+                sh:datatype xsd:string ;
+                sh:minCount 1 ;
+                sh:maxCount 1 ;
+                sh:message "Each interest must have a label." ;
+            ] ;
+        ] ;
+.
+
+rxyz:Person_email a sh:PropertyShape ;
+    sh:path rxyz:email ;
+    sh:name "Email" ;
+    sh:description "Contact email address." ;
+    sh:order 2 ;
+    sh:datatype xsd:string ;
+    sh:pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
+    sh:minCount 0 ;
+.
+
+rxyz:Person_birthDate a sh:PropertyShape ;
+    sh:path rxyz:birthDate ;
+    sh:name "Birth Date" ;
+    sh:description "Date of birth." ;
+    sh:order 3 ;
+    sh:datatype xsd:date ;
+    sh:maxCount 1 ;
+    sh:message "Person can have at most one birth date." ;
+.
+
+# ----------------------------------------------------------------------------
+# 2.2 Author - Subclass with sh:node reference
+# ----------------------------------------------------------------------------
+
+rxyz:Author a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Author" ;
+    rdfs:comment "A person who writes content." ;
+    rdfs:subClassOf rxyz:Person ;
+    sh:property
+        [ sh:path rxyz:authorOf ;
+          sh:name "Author Of" ;
+          sh:node rxyz:CreativeWork ;
+          sh:minCount 1 ; ] ,
+        [ sh:path rxyz:biography ;
+          sh:name "Biography" ;
+          sh:datatype xsd:string ;
+          sh:maxLength 5000 ; ] ;
+.
+
+# ----------------------------------------------------------------------------
+# 2.3 Content Shapes
+# ----------------------------------------------------------------------------
+
+rxyz:CreativeWork a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Creative Work" ;
+    rdfs:comment "A creative or intellectual work." ;
+    rdfs:subClassOf rxyz:Thing ;
+    sh:property 
+        [ sh:path rxyz:title ;
+          sh:name "Title" ;
+          sh:order 1 ;
+          sh:datatype xsd:string ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ;
+          sh:minLength 1 ;
+          sh:maxLength 500 ; ] ,
+        [ sh:path rxyz:dateCreated ;
+          sh:name "Date Created" ;
+          sh:order 2 ;
+          sh:datatype xsd:dateTime ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:datePublished ;
+          sh:name "Date Published" ;
+          sh:order 3 ;
+          sh:datatype xsd:dateTime ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:creator ;
+          sh:name "Creator" ;
+          sh:order 4 ;
+          sh:node rxyz:Agent ;
+          sh:minCount 1 ; ] ,
+        [ sh:path rxyz:about ;
+          sh:name "About" ;
+          sh:order 5 ;
+          sh:node rxyz:Topic ; ] ;
+.
+
+rxyz:Article a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Article" ;
+    rdfs:comment "A written composition." ;
+    rdfs:subClassOf rxyz:CreativeWork ;
+    sh:property
+        [ sh:path rxyz:wordCount ;
+          sh:name "Word Count" ;
+          sh:datatype xsd:integer ;
+          sh:minInclusive 1 ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:abstract ;
+          sh:name "Abstract" ;
+          sh:datatype xsd:string ;
+          sh:maxLength 1000 ;
+          sh:maxCount 1 ; ] ;
 .
 
 rxyz:BlogPost a rdfs:Class, sh:NodeShape ;
     rdfs:label "Blog Post" ;
-    rdfs:comment "A blog post is a piece of content that is published on a blog." ;
+    rdfs:comment "An informal article published on a blog." ;
+    rdfs:subClassOf rxyz:Article ;
+    sh:property
+        [ sh:path rxyz:isPartOf ;
+          sh:name "Is Part Of" ;
+          sh:node rxyz:Blog ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:tag ;
+          sh:name "Tags" ;
+          sh:datatype xsd:string ; ] ;
+.
+
+rxyz:Blog a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Blog" ;
+    rdfs:comment "A regularly updated website with posts." ;
+    rdfs:subClassOf rxyz:CreativeWork ;
+    sh:property
+        [ sh:path rxyz:hasBlogPost ;
+          sh:name "Has Blog Post" ;
+          sh:node rxyz:BlogPost ;
+          sh:minCount 1 ; ] ,
+        [ sh:path rxyz:owner ;
+          sh:name "Owner" ;
+          sh:node rxyz:Agent ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ; ] ;
+.
+
+# ----------------------------------------------------------------------------
+# 2.4 Validation-Only Shapes (pure sh:NodeShape)
+# ----------------------------------------------------------------------------
+
+rxyz:PublishedContentShape a sh:NodeShape ;
+    rdfs:label "Published Content Shape" ;
+    rdfs:comment "Validation shape for published content." ;
+    sh:targetClass rxyz:CreativeWork ;
     sh:property [
-        a owl:DatatypeProperty, sh:PropertyShape ;
-        sh:path rxyz:headline ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:string ;
-        sh:message "Blog posts must have a single headline." ;
-    ] , [
-        a owl:DatatypeProperty, sh:PropertyShape ;
-        sh:path rxyz:text ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:string ;
-        sh:message "Blog posts must have a single text." ;
-    ] , [
-        a owl:DatatypeProperty, sh:PropertyShape ;
         sh:path rxyz:datePublished ;
         sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:datatype xsd:dateTime ;
-        sh:message "Blog posts must have a single date published." ;
+        sh:message "Published content must have a publication date." ;
+    ] , [
+        sh:path rxyz:creator ;
+        sh:minCount 1 ;
+        sh:message "Published content must have at least one creator." ;
     ] ;
 .
 
-rxyz:Blog_hasBlogPost a owl:ObjectProperty, sh:PropertyShape ;
-    rdfs:label "Has Blog Post" ;
-    rdfs:comment "A blog has a blog post." ;
-    sh:path rxyz:hasBlogPost ;
-    sh:node rxyz:BlogPost ;
-    sh:minCount 1 ;
+rxyz:ValidEmailShape a sh:NodeShape ;
+    rdfs:label "Valid Email Shape" ;
+    rdfs:comment "Validates email address format." ;
+    sh:targetObjectsOf rxyz:email ;
+    sh:datatype xsd:string ;
+    sh:pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
 .
+
+# ============================================================================
+# SECTION 3: OWL CLASSES
+# ============================================================================
+
+rxyz:Agent a owl:Class ;
+    rdfs:label "Agent" ;
+    rdfs:comment "An entity capable of performing actions. Either a Person or Organization." ;
+    rdfs:subClassOf rxyz:Thing ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:unionOf ( rxyz:Person rxyz:Organization )
+    ] ;
+.
+
+rxyz:Organization a owl:Class, sh:NodeShape ;
+    rdfs:label "Organization" ;
+    rdfs:comment "A company, institution, or group." ;
+    rdfs:subClassOf rxyz:Agent ;
+    owl:disjointWith rxyz:Person ;
+    sh:property
+        [ sh:path rxyz:legalName ;
+          sh:name "Legal Name" ;
+          sh:datatype xsd:string ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:foundedDate ;
+          sh:name "Founded Date" ;
+          sh:datatype xsd:date ;
+          sh:maxCount 1 ; ] ;
+.
+
+rxyz:Reviewer a owl:Class ;
+    rdfs:label "Reviewer" ;
+    rdfs:comment "A person who reviews content." ;
+    rdfs:subClassOf rxyz:Person ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty rxyz:reviews ;
+        owl:minCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    owl:disjointWith rxyz:Author ;
+.
+
+# ============================================================================
+# SECTION 4: OBJECT PROPERTIES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 4.1 Simple Properties
+# ----------------------------------------------------------------------------
+
+rxyz:creator a owl:ObjectProperty ;
+    rdfs:label "creator" ;
+    rdfs:comment "The agent who created this resource." ;
+    rdfs:domain rxyz:CreativeWork ;
+    rdfs:range rxyz:Agent ;
+.
+
+rxyz:about a owl:ObjectProperty ;
+    rdfs:label "about" ;
+    rdfs:comment "The subject matter of a creative work." ;
+    rdfs:domain rxyz:CreativeWork ;
+    rdfs:range rxyz:Topic ;
+.
+
+# ----------------------------------------------------------------------------
+# 4.2 Inverse Property Pairs
+# ----------------------------------------------------------------------------
+
+rxyz:authorOf a owl:ObjectProperty ;
+    rdfs:label "author of" ;
+    rdfs:comment "Relates an author to works they have written." ;
+    rdfs:domain rxyz:Author ;
+    rdfs:range rxyz:CreativeWork ;
+    owl:inverseOf rxyz:hasAuthor ;
+.
+
+rxyz:hasAuthor a owl:ObjectProperty ;
+    rdfs:label "has author" ;
+    rdfs:comment "The author of a creative work." ;
+    rdfs:domain rxyz:CreativeWork ;
+    rdfs:range rxyz:Author ;
+    owl:inverseOf rxyz:authorOf ;
+.
+
+rxyz:reviews a owl:ObjectProperty ;
+    rdfs:label "reviews" ;
+    rdfs:comment "A reviewer reviews content." ;
+    rdfs:domain rxyz:Reviewer ;
+    rdfs:range rxyz:CreativeWork ;
+    owl:inverseOf rxyz:hasReviewer ;
+.
+
+rxyz:hasReviewer a owl:ObjectProperty ;
+    rdfs:label "has reviewer" ;
+    rdfs:comment "Content reviewed by this reviewer." ;
+    rdfs:domain rxyz:CreativeWork ;
+    rdfs:range rxyz:Reviewer ;
+    owl:inverseOf rxyz:reviews ;
+.
+
+rxyz:hasBlogPost a owl:ObjectProperty ;
+    rdfs:label "has blog post" ;
+    rdfs:comment "A blog contains these posts." ;
+    schema:domainIncludes rxyz:Blog ;
+    rdfs:range rxyz:BlogPost ;
+    owl:inverseOf rxyz:isPartOf ;
+.
+
+rxyz:isPartOf a owl:ObjectProperty ;
+    rdfs:label "is part of" ;
+    rdfs:comment "This resource is part of a larger resource." ;
+    schema:domainIncludes rxyz:BlogPost, rxyz:Article ;
+    schema:rangeIncludes rxyz:Blog, rxyz:CreativeWork ;
+    owl:inverseOf rxyz:hasBlogPost ;
+.
+
+# ----------------------------------------------------------------------------
+# 4.3 Property Characteristics
+# ----------------------------------------------------------------------------
+
+rxyz:owner a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:label "owner" ;
+    rdfs:comment "The single owner of a resource." ;
+    rdfs:range rxyz:Agent ;
+.
+
+rxyz:knows a owl:ObjectProperty, owl:SymmetricProperty ;
+    rdfs:label "knows" ;
+    rdfs:comment "Mutual acquaintance between persons." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Person ;
+.
+
+rxyz:broader a owl:ObjectProperty, owl:TransitiveProperty ;
+    rdfs:label "broader" ;
+    rdfs:comment "A broader (more general) topic." ;
+    rdfs:domain rxyz:Topic ;
+    rdfs:range rxyz:Topic ;
+    owl:inverseOf rxyz:narrower ;
+    rdfs:subPropertyOf skos:broader ;
+.
+
+rxyz:narrower a owl:ObjectProperty, owl:TransitiveProperty ;
+    rdfs:label "narrower" ;
+    rdfs:comment "A narrower (more specific) topic." ;
+    rdfs:domain rxyz:Topic ;
+    rdfs:range rxyz:Topic ;
+    owl:inverseOf rxyz:broader ;
+    rdfs:subPropertyOf skos:narrower ;
+.
+
+# ----------------------------------------------------------------------------
+# 4.4 Property Hierarchy
+# ----------------------------------------------------------------------------
+
+rxyz:memberOf a owl:ObjectProperty ;
+    rdfs:label "member of" ;
+    rdfs:comment "The person is a member of this organization." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Organization ;
+    owl:inverseOf rxyz:hasMember ;
+.
+
+rxyz:hasMember a owl:ObjectProperty ;
+    rdfs:label "has member" ;
+    rdfs:comment "The organization has this person as member." ;
+    rdfs:domain rxyz:Organization ;
+    rdfs:range rxyz:Person ;
+    owl:inverseOf rxyz:memberOf ;
+.
+
+rxyz:worksFor a owl:ObjectProperty ;
+    rdfs:label "works for" ;
+    rdfs:comment "Employment relationship." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Organization ;
+    rdfs:subPropertyOf rxyz:memberOf ;
+    owl:inverseOf rxyz:employs ;
+.
+
+rxyz:employs a owl:ObjectProperty ;
+    rdfs:label "employs" ;
+    rdfs:comment "The organization employs this person." ;
+    rdfs:domain rxyz:Organization ;
+    rdfs:range rxyz:Person ;
+    rdfs:subPropertyOf rxyz:hasMember ;
+    owl:inverseOf rxyz:worksFor ;
+.
+
+# ----------------------------------------------------------------------------
+# 4.5 Property Chains
+# ----------------------------------------------------------------------------
+
+rxyz:colleagueOf a owl:ObjectProperty, owl:SymmetricProperty ;
+    rdfs:label "colleague of" ;
+    rdfs:comment "Two people who work for the same organization." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Person ;
+    owl:propertyChainAxiom ( rxyz:worksFor rxyz:employs ) ;
+.
+
+rxyz:parentOf a owl:ObjectProperty ;
+    rdfs:label "parent of" ;
+    rdfs:comment "Parent-child relationship." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Person ;
+    owl:inverseOf rxyz:childOf ;
+.
+
+rxyz:childOf a owl:ObjectProperty ;
+    rdfs:label "child of" ;
+    rdfs:comment "Child-parent relationship." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Person ;
+    owl:inverseOf rxyz:parentOf ;
+.
+
+rxyz:grandparentOf a owl:ObjectProperty ;
+    rdfs:label "grandparent of" ;
+    rdfs:comment "Grandparent relationship via property chain." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Person ;
+    owl:propertyChainAxiom ( rxyz:parentOf rxyz:parentOf ) ;
+.
+
+# ============================================================================
+# SECTION 5: SAMPLE INSTANCES
+# ============================================================================
+
+# Topics
+rxyz:TechTopic a rxyz:Topic ;
+    rdfs:label "Technology" ;
+    rdfs:comment "Technology-related topics." ;
+.
+
+rxyz:WebDevTopic a rxyz:Topic ;
+    rdfs:label "Web Development" ;
+    rdfs:comment "Web development technologies and practices." ;
+    rxyz:broader rxyz:TechTopic ;
+.
+
+rxyz:SemWebTopic a rxyz:Topic ;
+    rdfs:label "Semantic Web" ;
+    rdfs:comment "Semantic Web technologies: RDF, OWL, SHACL." ;
+    rxyz:broader rxyz:WebDevTopic ;
+.
+
+rxyz:SvelteTopic a rxyz:Topic ;
+    rdfs:label "Svelte" ;
+    rdfs:comment "Svelte framework and SvelteKit." ;
+    rxyz:broader rxyz:WebDevTopic ;
+.
+
+# Organization
+rxyz:AcmeCorp a rxyz:Organization ;
+    rxyz:legalName "Acme Corporation" ;
+    rxyz:foundedDate "2010-01-15"^^xsd:date ;
+.
+
+# Persons
+rxyz:AliceSmith a rxyz:Author ;
+    rxyz:name "Alice Smith" ;
+    rxyz:email "alice@example.com" ;
+    rxyz:birthDate "1985-03-22"^^xsd:date ;
+    rxyz:biography "Software engineer and technical writer." ;
+    rxyz:worksFor rxyz:AcmeCorp ;
+.
+
+rxyz:BobJones a rxyz:Person ;
+    rxyz:name "Bob Jones" ;
+    rxyz:email "bob@example.com" ;
+    rxyz:memberOf rxyz:AcmeCorp ;
+    rxyz:knows rxyz:AliceSmith ;
+.
+
+rxyz:CharlieReviewer a rxyz:Reviewer ;
+    rxyz:name "Charlie Brown" ;
+    rxyz:email "charlie@example.com" ;
+.
+
+# Blog and Posts
+rxyz:TechBlog a rxyz:Blog ;
+    rxyz:title "The Tech Blog" ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:owner rxyz:AcmeCorp ;
+    rxyz:dateCreated "2020-06-01T00:00:00Z"^^xsd:dateTime ;
+.
+
+rxyz:Post1 a rxyz:BlogPost ;
+    rxyz:title "Introduction to SHACL" ;
+    rxyz:abstract "Learn the basics of SHACL for RDF data validation." ;
+    rxyz:wordCount 2500 ;
+    rxyz:dateCreated "2024-01-15T10:30:00Z"^^xsd:dateTime ;
+    rxyz:datePublished "2024-01-16T09:00:00Z"^^xsd:dateTime ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:hasAuthor rxyz:AliceSmith ;
+    rxyz:isPartOf rxyz:TechBlog ;
+    rxyz:about rxyz:SemWebTopic ;
+    rxyz:tag "SHACL", "RDF", "validation" ;
+.
+
+rxyz:Post2 a rxyz:BlogPost ;
+    rxyz:title "Building Knowledge Graphs with RDF" ;
+    rxyz:abstract "A practical guide to constructing knowledge graphs." ;
+    rxyz:wordCount 3200 ;
+    rxyz:dateCreated "2024-02-20T14:00:00Z"^^xsd:dateTime ;
+    rxyz:datePublished "2024-02-21T08:00:00Z"^^xsd:dateTime ;
+    rxyz:creator rxyz:AliceSmith ;
+    rxyz:hasAuthor rxyz:AliceSmith ;
+    rxyz:isPartOf rxyz:TechBlog ;
+    rxyz:about rxyz:SemWebTopic, rxyz:WebDevTopic ;
+    rxyz:tag "RDF", "knowledge graph", "semantic web" ;
+.
+
+# Link blog to posts
+rxyz:TechBlog rxyz:hasBlogPost rxyz:Post1, rxyz:Post2 .
+
+# Author links
+rxyz:AliceSmith rxyz:authorOf rxyz:Post1, rxyz:Post2, rxyz:TechBlog .
+
+# Reviewer reviewed content
+rxyz:CharlieReviewer rxyz:reviews rxyz:Post1 .
+rxyz:Post1 rxyz:hasReviewer rxyz:CharlieReviewer .

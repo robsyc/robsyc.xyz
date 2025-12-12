@@ -1,11 +1,15 @@
 <script lang="ts">
     /**
-     * Main App Page - Knowledge Graph Visualization
+     * Main App Page - RDF Schema Visualization
      * 
-     * Uses SvelteFlow to display an interactive RDF graph with:
+     * Uses SvelteFlow to display an interactive view of RDF ObjectTypes and LinkTypes.
+     * - ObjectTypes: rdfs:Class, owl:Class, sh:NodeShape
+     * - LinkTypes: owl:ObjectProperty, sh:PropertyShape with sh:node
+     * 
+     * Features:
      * - Clownface-powered node components for RDF data access
-     * - SHACL shape-driven node type mapping
-     * - Dynamic graph loading via action buttons
+     * - Type-detection based rendering
+     * - Details, Serialize, and Instances dialogs
      */
     import { mode } from 'mode-watcher';
     import { onMount } from 'svelte';
@@ -14,23 +18,23 @@
         Controls,
         Background,
         BackgroundVariant,
-        // MiniMap,
+        MiniMap,
     } from '@xyflow/svelte';
     import type { Node, Edge } from '@xyflow/svelte';
+    import '@xyflow/svelte/dist/style.css';
 
-    // RDF store and Clownface-powered mapper
+    // RDF store and flow mapper
     import { rdfStore } from '$lib/stores/rdf.svelte';
-    import { quadsToFlowElements } from '$lib/rdf/flow-mapper-cf';
+    import { mapRdfToFlow } from '$lib/rdf/flow-mapper';
     
-    // Node components - modeling view uses generic ShapeNode
-    // TODO: down the line we could add more than just ShapeNode
-    // ShapeNode is for declarative modeling
-    // for procedural logic and workflows we should add distinct node types (~n8n)
-    import ShapeNode from '$lib/components/flow/nodes/archive/ShapeNode.svelte';
+    // Node components
+    import ObjectTypeNode from '$lib/components/flow/nodes/ObjectTypeNode.svelte';
+    import LinkTypeNode from '$lib/components/flow/nodes/LinkTypeNode.svelte';
     
-    // Register node types - modeling view always uses generic ShapeNode
+    // Register node types
     const nodeTypes = {
-        // shape: ShapeNode,
+        objectType: ObjectTypeNode,
+        linkType: LinkTypeNode,
     };
    
     // State
@@ -53,14 +57,12 @@
     // Load initial data on mount
     onMount(async () => {
         try {
-            loadingMessage = 'Loading home...';
+            loadingMessage = 'Loading RDF data...';
             await rdfStore.load({ url: '/graphs/home.ttl' });
-            console.log('[App] Loaded home graph');
+            console.log('[App] Loaded home graph, store size:', rdfStore.size);
             
             loadingMessage = 'Building visualization...';
-            const elements = quadsToFlowElements(rdfStore, {
-                nodeTypeStrategy: 'generic',
-            });
+            const elements = mapRdfToFlow(rdfStore);
             
             nodes = elements.nodes;
             edges = elements.edges;
@@ -81,6 +83,16 @@
 </script>
 
 <div class="relative w-full h-full">
+    {#if isLoading}
+        <!-- Loading overlay -->
+        <div class="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
+            <div class="flex flex-col items-center gap-3">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <p class="text-sm text-muted-foreground">{loadingMessage}</p>
+            </div>
+        </div>
+    {/if}
+
     <SvelteFlow
         bind:nodes
         bind:edges
@@ -89,13 +101,23 @@
         {nodeTypes}
         onnodeclick={handleNodeClick}
         proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{
+            type: 'smoothstep',
+            animated: false,
+        }}
     >
         <Controls />
         <Background 
-            bgColor="var(--accent)"
+            bgColor="var(--background)"
             variant={BackgroundVariant.Dots} 
         />
-        <!-- MiniMap -->
+        <MiniMap 
+            nodeColor={(node) => {
+                if (node.type === 'objectType') return 'var(--primary)';
+                if (node.type === 'linkType') return 'var(--secondary)';
+                return 'var(--muted)';
+            }}
+        />
     </SvelteFlow>
     
     <!-- Error overlay -->
@@ -105,7 +127,7 @@
                 <div class="rounded-full h-12 w-12 bg-destructive/20 flex items-center justify-center">
                     <span class="text-destructive text-xl">!</span>
                 </div>
-                <p class="text-destructive font-medium">Failed to load knowledge graph</p>
+                <p class="text-destructive font-medium">Failed to load RDF data</p>
                 <p class="text-muted-foreground text-sm">{error}</p>
                 <button 
                     class="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"

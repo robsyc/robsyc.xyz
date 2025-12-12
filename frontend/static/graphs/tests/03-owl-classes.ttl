@@ -1,0 +1,111 @@
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rxyz: <http://robsyc.xyz/onto#> .
+
+################################################################################
+# TEST: OWL Classes with Advanced Constructs
+# 
+# PURPOSE: Test owl:Class detection and OWL-specific features
+#          - owl:equivalentClass (including anonymous class expressions)
+#          - owl:disjointWith
+#          - owl:Restriction (cardinality, value restrictions)
+#          - Combination of owl:Class + sh:NodeShape
+# 
+# EXPECTED UI: ObjectType nodes with 
+# - owl:Class badge
+# - Details dialog with OWL-specific sections (only when applicable)
+################################################################################
+
+# -----------------------------------------------------------------------------
+# 3.1 Simple owl:Class with equivalentClass (union)
+# -----------------------------------------------------------------------------
+
+rxyz:Agent a owl:Class ;
+    rdfs:label "Agent" ;
+    rdfs:comment "An entity capable of performing actions. Either a Person or Organization." ;
+    rdfs:subClassOf rxyz:Thing ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:unionOf ( rxyz:Person rxyz:Organization )
+        # NOTE: rxyz:Person is not defined here... how to handle this...
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 3.2 owl:Class with disjointWith + sh:NodeShape
+# -----------------------------------------------------------------------------
+
+rxyz:Organization a owl:Class, sh:NodeShape ;
+    rdfs:label "Organization" ;
+    rdfs:comment "A company, institution, or group." ;
+    rdfs:subClassOf rxyz:Agent ;
+    owl:disjointWith rxyz:Person ;
+    sh:property
+        [ sh:path rxyz:legalName ;
+          sh:name "Legal Name" ;
+          sh:datatype xsd:string ;
+          sh:minCount 1 ;
+          sh:maxCount 1 ; ] ,
+        [ sh:path rxyz:foundedDate ;
+          sh:name "Founded Date" ;
+          sh:datatype xsd:date ;
+          sh:maxCount 1 ; ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 3.3 owl:Class with owl:Restriction (OWL cardinality)
+# -----------------------------------------------------------------------------
+
+rxyz:Reviewer a owl:Class ;
+    rdfs:label "Reviewer" ;
+    rdfs:comment "A person who reviews content. Must have reviewed at least one work." ;
+    rdfs:subClassOf rxyz:Person ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty rxyz:reviews ;
+        owl:minCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    owl:disjointWith rxyz:Author ;  # Demo: reviewers can't be authors
+.
+
+# -----------------------------------------------------------------------------
+# 3.4 owl:Class with value restriction
+# -----------------------------------------------------------------------------
+
+rxyz:TechAuthor a owl:Class ;
+    rdfs:label "Tech Author" ;
+    rdfs:comment "An author who writes about technology topics." ;
+    rdfs:subClassOf rxyz:Author ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty rxyz:writesAbout ;
+        owl:someValuesFrom rxyz:TechnologyTopic
+    ] ;
+.
+
+# -----------------------------------------------------------------------------
+# 3.5 owl:Class with hasValue restriction
+# -----------------------------------------------------------------------------
+
+rxyz:PublishedWork a owl:Class ;
+    rdfs:label "Published Work" ;
+    rdfs:comment "A creative work that has been published." ;
+    rdfs:subClassOf rxyz:CreativeWork ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty rxyz:status ;
+        owl:hasValue rxyz:StatusPublished
+    ] ;
+.
+
+# Status values for the restriction demo
+rxyz:StatusPublished a owl:NamedIndividual ;
+    rdfs:label "Published" ;
+.
+
+rxyz:StatusDraft a owl:NamedIndividual ;
+    rdfs:label "Draft" ;
+.

@@ -16,8 +16,8 @@
 
   import { ArrowRight, Compass } from "@lucide/svelte";
 
-  import { ns } from '$lib/rdf/clownface-store';
-  import type { GraphPointer } from '$lib/rdf/clownface-store';
+  import { ns } from '$lib/stores/rdf.svelte';
+  import type { GraphPointer } from 'clownface';
   import type { Term } from '@rdfjs/types';
   import type { Store } from 'n3';
   import { getLocalName } from '$lib/rdf/utils';

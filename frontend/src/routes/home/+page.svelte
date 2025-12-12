@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
     /**
      * Home Page - Presentation Flow
      * 
@@ -174,10 +174,8 @@
             bgColor="var(--accent)"
             variant={BackgroundVariant.Dots} 
         />
-        <!-- MiniMap -->
     </SvelteFlow>
     
-    <!-- Error overlay -->
     {#if error}
         <div class="absolute inset-0 bg-background/90 flex items-center justify-center z-50">
             <div class="flex flex-col items-center gap-3 max-w-md text-center p-6">
@@ -197,4 +195,4 @@
     {/if}
 </div>
 
-
+ -->

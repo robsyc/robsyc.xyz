@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
   /**
    * ShapeSerializerDialog - SHACL-Driven RDF Serialization
    * 
@@ -121,4 +121,4 @@
   </Dialog.Content>
 </Dialog.Root>
 
-
+ -->
