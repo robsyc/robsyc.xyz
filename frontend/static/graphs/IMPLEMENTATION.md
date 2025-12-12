@@ -24,16 +24,16 @@ Create a dynamic, semantic-aware UI for visualizing and editing RDF data (RDFS, 
 
 ### Core Principles
 
-1. **Progressive Disclosure**: Show OWL features only for owl:Class, SHACL features only for sh:NodeShape
-2. **Lazy Loading**: Compute expensive data (OWL restrictions, SHACL paths) only when dialogs open
-3. **Single Source of Truth**: Clownface pointers generated from the RDF graph(s) as the data interface for all components
-4. **Inverse Property Consolidation and other UI/UX sugar**: Show inverse property pairs as single nodes with toggle, toggle views/rendering, inference mode/inferred triples graph that when parsed results in UI nodes with dotted lines, etc.
+1. **Progressive Disclosure**: Show OWL features only for owl:Class, SHACL features only for sh:NodeShape, etc.
+2. **Lazy Loading**: Compute expensive data (OWL restrictions, SHACL paths) only when e.g. dialogs open. We keep the canvas light and the user builds up the UI incrementally.
+3. **Single Source of Truth**: Clownface pointers generated from the RDF graph(s) as the data interface for all components. Pointers are used to traverse the graph in various graph patterns and to create LPG-like nodes and edges.
+4. **Inverse Property Consolidation and other UI/UX sugar**: Show inverse property pairs as single nodes with toggle to switch view; dynamic rendering of hierarchy and topology; inference mode to show inferred triples graph with distinct UI (dotted lines, ...), etc.
 
 ### Technologies
 
 | Technology | Purpose |
 |------------|---------|
-| **N3.js** | RDF parsing, storage, serialization (also has reasoning capabilities but eye-js might be better suited) |
+| **N3.js** | RDF parsing, storage, serialization (has reasoning but < eye-js) |
 | **Clownface** | Graph traversal and manipulation |
 | **clownface-shacl-path** | Complex SHACL property path handling |
 | **SvelteFlow** | Node-based UI visualization |
@@ -45,17 +45,17 @@ Create a dynamic, semantic-aware UI for visualizing and editing RDF data (RDFS, 
 
 ### ObjectType (Classes/Shapes)
 
-Resources that define **types** of things. Detected by `rdf:type`:
+Resources that define **types** of things. Detected by `? rdf:type rdfs:Class/owl:Class/sh:NodeShape`:
 
 | Type Pattern | Flags | UI Features |
 |--------------|-------|-------------|
-| `rdfs:Class` only | `isRdfsClass` | Basic class info, rdfs:subClassOf/skos:broader hierarchy |
+| `rdfs:Class` only | `isRdfsClass` | Basic class info & annotation props, rdfs:subClassOf/skos:broader hierarchy |
 | `owl:Class` | `isOwlClass` (implies isRdfsClass) | + OWL restrictions, equivalence, disjointness |
 | `sh:NodeShape` only | `isNodeShape` | + (nested) sh:PropertyShapes, sh:targetClass, metadata |
-| `rdfs:Class + sh:NodeShape` | Both flags | ShapeClass pattern (SHACL 1.2) w/ implicit target |
+| `rdfs:Class + sh:NodeShape` | Both flags | equivalent to sh:ShapeClass (SHACL 1.2) w/ implicit target |
 | `owl:Class + sh:NodeShape` | All flags | Full OWL + SHACL features |
 
-Instances of object types are called objects. They are detected by `rdf:type` of the ObjectType and `owl:NamedIndividual`. The `sh:PropertyShape`s of the ObjectType can be quite complex and nested, see below.
+Instances of object types are called objects. They are detected by `rdf:type` of the ObjectType and `owl:NamedIndividual`. The `sh:PropertyShape`s of the node shape object types can be quite complex and nested, see below.
 
 ### ObjectProperty (Relationships)
 
@@ -76,9 +76,9 @@ Instances of object properties (between objects) are called links. They are dete
 
 Not visualized as nodes but shown in ObjectType details. Can be:
 - **Named**: IRI subject with `rdf:type sh:PropertyShape`
-- **Blank Node**: Inline in `sh:property` list
-- **Nested**: Contains `sh:property` for multi-level validation
-- **sh:node reference**: Points to another NodeShape
+- **Blank Node**: Inline in `sh:property` list (might be tricky to handle)
+- **Nested**: Contains `sh:property` for BFO-aligned graph patterns
+- **sh:node reference**: Points to another NodeShape (w/ button to close dialog and open see the referenced UI node on the canvas)
 
 Have associated to them
 - metadata like `sh:name`, `sh:description`, `sh:order`, `sh:group`, `sh:closed`, `sh:message`, `sh:ignoredProperties`, etc.
@@ -86,7 +86,7 @@ Have associated to them
 - property paths like `sh:path`, `sh:inversePath`, `sh:sequencePath`, `sh:alternativePath`, `sh:zeroOrMorePath`, `sh:oneOrMorePath`, `sh:zeroOrOnePath`, etc.
 - targets like `sh:targetClass`, `sh:targetObjectsOf`, etc.
 
-The properties defined in `sh:path` can be explicitly defined owl:DatatypeProperty or owl:ObjectProperty but not necessarily. It should work for both.
+The properties defined in `sh:path` can be explicitly defined owl:DatatypeProperty or owl:ObjectProperty but not necessarily. It should work for both. More details on SHACL can be found in the specification. SHACL 1.2 Core and SHACL 1.2 UI are our main references, but we don't have a shacl 1.2. validator yet.
 
 ---
 
@@ -97,7 +97,7 @@ Located in `frontend/static/graphs/tests/`:
 | File | Purpose | Key Features Tested |
 |------|---------|---------------------|
 | `01-basic-classes.ttl` | Simple rdfs:Class | Hierarchy, labels, comments |
-| `02-shacl-shapes.ttl` | SHACL NodeShapes | PropertyShapes, nesting, sh:node |
+| `02-shacl-shapes.ttl` | SHACL NodeShapes | simple PropertyShapes, nesting, sh:node |
 | `03-owl-classes.ttl` | OWL constructs | Restrictions, equivalence, disjoint |
 | `04-object-properties.ttl` | Object properties | Inverse, characteristics, chains |
 | `05-complex-paths.ttl` | SHACL paths | Sequence, alternative, inverse paths |
@@ -110,7 +110,7 @@ Located in `frontend/static/graphs/tests/`:
 await rdfStore.load({ url: '/graphs/tests/02-shacl-shapes.ttl' });
 ```
 
-We should implement a way to enter a url and load the graph from it.
+We should implement a way to enter a url and load the triples graph from it.
 
 ---
 
@@ -139,6 +139,8 @@ function detectObjectType(pointer: GraphPointer): ObjectTypeFlags {
 }
 ```
 
+For toggle functionality, we're not yet sure if we should store it here, or higher up in the flow mapping logic / componentry.
+
 ### ObjectProperty Detection (WIP)
 
 ```typescript
@@ -154,7 +156,7 @@ interface ObjectPropertyFlags {
 function detectObjectProperty(pointer: GraphPointer): ObjectPropertyFlags {
   const types = pointer.out(ns.rdf('type')).terms;
   const typeSet = new Set(types.map(t => t.value));
-  const inversePtr = pointer.out(ns.owl('inverseOf')); // or p.in(ns.owl('inverseOf')) ?
+  const inversePtr = pointer.out(ns.owl('inverseOf')); // or p.in(ns.owl('inverseOf')) ? Or also query inferred triples graph ?
   
   return {
     isFunctional: typeSet.has(ns.owl('FunctionalProperty').value),
@@ -167,9 +169,11 @@ function detectObjectProperty(pointer: GraphPointer): ObjectPropertyFlags {
 }
 ```
 
+In effect, for both types of entities, we want a manageable but flexible set of flags to manage dynamic behavior, pointer traversal and UI presentation.
+
 ### Finding All ObjectTypes/Properties (WIP)
 
-Possibly we should use distinct RDF graphs for ontology schema vs. instance data...
+Possibly we should use distinct RDF graphs for ontology schema vs. instance data vs. inferred data vs. etc.
 
 ```typescript
 function findAllObjectTypes(store: RdfStore): ObjectTypeInfo[] {
@@ -177,6 +181,7 @@ function findAllObjectTypes(store: RdfStore): ObjectTypeInfo[] {
   const seen = new Set<string>();
   
   // Query for each type
+  // TODO: is there no more efficient way with sparql or join queries instead of deduplication with a set?
   for (const typeIri of [ns.rdfs('Class'), ns.owl('Class'), ns.sh('NodeShape')]) {
     for (const quad of store.getQuads(null, ns.rdf('type'), typeIri)) {
       if (seen.has(quad.subject.value)) continue;
@@ -193,8 +198,6 @@ function findAllObjectTypes(store: RdfStore): ObjectTypeInfo[] {
   return results;
 }
 ```
-
-It will be a bit tricky to consolidate inverse ObjectProperties as single nodes with toggle.
 
 ---
 
@@ -215,7 +218,9 @@ function mapRdfToFlow(store: RdfStore): { nodes: Node[], edges: Edge[] } {
     nodes.push({
       id: info.iri,
       type: 'objectType',
-      position: getPosition(info.pointer, nodes.length), // possibly use more sophisticated layout algorithm like force-directed graph layout
+      position: getPosition(info.pointer, nodes.length), 
+      // Possibly use more sophisticated layout algorithm like force-directed graph layout
+      // We would also like for the placement of UI nodes to be saved (with a flag) and restored when the user navigates back to the graph.
       data: { pointer: info.pointer, iri: info.iri, flags: info.flags },
     });
     nodeIds.add(info.iri);
@@ -256,39 +261,49 @@ function mapRdfToFlow(store: RdfStore): { nodes: Node[], edges: Edge[] } {
 }
 ```
 
-The creation of instances will require different logic and should be handled separately; the object properties will be edges between objects instead of first class nodes.
+We should also think about NOT rendering all nodes/edges at once but rather e.g. only the top concepts in the hierarchy and then load the rest incrementally when the user navigates with toggles, searches, etc. The flow should look peaceful and responsive, or familiar by storing placement state and restoring it the next time the user visits the graph.
+
+The creation of instances (particulars or universals) will require different logic and should be handled separately; the object properties will be edges between objects instead of first class nodes, and the properties will be direct forms dynamically generated from the definitions higher order abstract flow (the universals)
 
 ### Edge Types
 
-| Edge Type | Source | Target |
-|-----------|--------|--------|
-| `skos:broader/narrower` | Child class/property/instance | Parent class/property/instance |
-| `rdfs:subClassOf` | Child class | Parent class |
-| `rdfs:subPropertyOf` | Child property | Parent property |
-| `rdfs:domain` and `schema:domainIncludes` | ObjectProperty | ObjectType |
-| `rdfs:range` and `schema:rangeIncludes` | ObjectProperty | ObjectType |
-| `sh:targetClass` | NodeShape | Class |
-| `sh:node` | NodeShape | NodeShape |
+| Edge Type | Source | Target | Description |
+|-----------|--------|--------|-------------|
+| `skos:broader/narrower` | Child class/property/instance | Parent class/property/instance | this is very generic & weak semantics but useful |
+| `rdfs:subClassOf` | Child class | Parent class | type propagation inference |
+| `rdfs:subPropertyOf` | Child property | Parent property | same but for properties |
+| `schema:domainIncludes` and `schema:rangeIncludes` | ObjectProperty | ObjectType | weakly typed; no inference |
+| `rdfs:domain` and `rdfs:range` | ObjectProperty | ObjectType | use of the predicate infers the type in subject and object |
+| `sh:targetClass` | NodeShape | Class | instances targeted by the node shape |
+| `sh:node` | NodeShape | NodeShape | can be used as a form of inheritance or nesting between node shapes |
 
-Object type and Object property nodes should support toggles for:
-- Locking the node on screen or removing it (e.g. via a clean button or by selected node's distance/screen visibility heuristics).
-- Showing/hiding edges for hierarchy; each edge has its own hide button, which also hides the connected node if it’s not locked. Edge toggles are placed at the top/bottom of the node.
-- For ObjectProperties: toggling domain(/Includes) and range(/Includes) visibility, with controls on the left/right sides.
+Object type and Object property UI nodes should support toggles for:
+
+- Locking the node on screen or allowing it to be removed (e.g. via a "clean" button or by selected node's distance, or screen-visibility heuristics).
+
+- Showing/hiding hierarchy (parent/child relationships with skos or rdfs); each edge has its own hide button, which also hides the connected node if it’s not locked. Toggles are placed at the top/bottom of the UI node.
+
+- For ObjectProperties: toggle domain(/Includes) and range(/Includes) visibility, with controls on the left/right sides.
+
 - For rdfs:Class nodes: show NodeShape(s) targeting them (bottom of node).
-- For sh:NodeShape nodes: show their targets (top), and show sh:node inheritance (instead of sub/superclass).
+
+- For sh:NodeShape nodes: show their target class(es) (top), and show sh:node inheritance (instead of sub/superclass).
+
 - Optionally, offer toggles for equivalence/disjointness (e.g. via a “...” popover) - currently out of scope. In the future we may also visualize PropertyShapes connected to ObjectProperties with sh:path.
+
+Important is to remeber that we want to keep the canvas clean, lean and intuitive, but also responsive, flexible and extensible by choosing more refined semantics and graph patterns.
 
 ---
 
 ## Node Components
 
-### ObjectTypeNode
+### ObjectTypeNode (WIP)
 
 File: `frontend/src/lib/components/flow/nodes/ObjectTypeNode.svelte`
 
 Key features:
 - Display class/shape badge, labels, comments
-- Toggle buttons for locking/unlocking the node, showing/hiding hierarchy edges, etc.
+- Toggle buttons for locking/unlocking the node, showing/hiding hierarchy edges, in domain/range of, etc.
 - Action buttons for Details, Serialize, Instances dialogs
 
 ```svelte
@@ -312,16 +327,16 @@ Key features:
   // ...
 </script>
 
-<!-- Rectangular shape with rounded left and right sides for ObjectType -->
+<!-- Wide rectangular shape with rounded left and right sides -->
 ```
 
-### ObjectPropertyNode
+### ObjectPropertyNode (WIP)
 
 File: `frontend/src/lib/components/flow/nodes/ObjectPropertyNode.svelte`
 
 Key features:
 - Toggle button for inverse property view
-- Display domain → range flow
+- Display domain → range and hierarchy flow
 - Show characteristic badges (Functional, Symmetric, etc.)
 
 ```svelte
@@ -350,7 +365,7 @@ Key features:
 
 ## Dialog Components
 
-### DetailsDialog
+### DetailsDialog (WIP)
 
 Show information based on type flags:
 
@@ -382,22 +397,22 @@ Show information based on type flags:
 {/if}
 ```
 
-### SerializeDialog
+### SerializeDialog (WIP)
 
 Features:
 - Extract quads for resource (with configurable depth and filters)
 - Turtle/N-Triples/JSON-LD/... serialization with prefixes
 - Copy to clipboard
-- **Future**: In-place editing that updates the RDF graph
+- **Future**: In-place editing that updates the RDF graph upon submission (possibly validation feedback, inference preview, ...) in a nice editor with syntax highlighting, auto-completion like Cursor, etc.
 
 ### InstancesDialog
 
 Features:
 - Query instances: `?s rdf:type :ThisClass` or `?s :thisProperty ?o`
-- Data table with sortable columns
+- Data table with configurable & sortable columns
 - Filter by property values
 - Open instance in form (generated from SHACL shape)
-- Visualize instance as node in flow
+- Visualize instance as node in flow (which also has dialog to open shacl-based form for editing)
 
 ---
 
@@ -418,7 +433,7 @@ Using `clownface-shacl-path` library.
 
 ### Parsing Paths
 
-We will likely need additional utilities to parse and display these elements thorougly. Same goes for OWL restrictions, SHACL properties and other complex graph patterns. However, Clownface will be our friend and the clownface-shacl-path library will help us a lot and give insights into how to use it effectively.
+We will likely need additional utilities to parse and display these elements thorougly. Same goes for OWL restrictions, SHACL metadata and other complex graph patterns. However, Clownface will be our friend and the `clownface-shacl-path` library will help us a lot and give insights into how to use it effectively.
 
 ```typescript
 import { fromNode, toSparql, findNodes } from 'clownface-shacl-path';
@@ -426,10 +441,11 @@ import { fromNode, toSparql, findNodes } from 'clownface-shacl-path';
 // Get path from PropertyShape
 const pathPtr = propertyShapePtr.out(ns.sh('path'));
 
-// Parse into structured path
+// Parse into structured path (ShaclPropertyPath type)
 const path = fromNode(pathPtr);
 
 // Convert to SPARQL property path syntax
+// Uses https://github.com/tpluscode/sparql-builder under the hood
 const sparqlPath = toSparql(path);
 
 // Find nodes matching the path from a start node
@@ -531,6 +547,10 @@ function pathToString(pathPtr: GraphPointer): string {
 - [SvelteFlow](https://svelteflow.dev/)
 - [shadcn-svelte](https://www.shadcn-svelte.com/)
 
+Potential libraries:
+- [sparql-builder](https://github.com/tpluscode/sparql-builder) for creating and executing SPARQL with binding of variables in JS
+- [eyereasoner](https://github.com/eyereasoner/eye-js) for reasoner inference and querying
+
 ### Internal Files
 
 | File | Purpose |
@@ -563,7 +583,7 @@ export const ns = {
 
 ---
 
-## UI/UX Principles from SHACL UI Spec (WIP; will become more concrete as we go and implement instances and forms)
+## UI/UX Principles from SHACL UI Spec (WIP; will become more concrete as we go and implement instances and dynamic forms)
 
 Based on [SHACL 1.2 UI Working Draft](https://w3c.github.io/data-shapes/shacl12-ui/):
 

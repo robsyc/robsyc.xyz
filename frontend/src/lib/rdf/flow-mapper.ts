@@ -180,3 +180,5 @@ export function getLabel(pointer: GraphPointer<NamedNode | BlankNode, Store>): s
 export function getComment(pointer: GraphPointer<NamedNode | BlankNode, Store>): string | undefined {
     return pointer.out(ns.rdfs('comment')).value;
 }
+
+

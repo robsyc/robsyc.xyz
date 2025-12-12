@@ -12,12 +12,13 @@
 #          - Named PropertyShapes vs blank node PropertyShapes
 #          - Various constraint types (datatype, cardinality, pattern, etc.)
 #          - Nested shapes (sh:node vs sh:property nesting)
-#          - sh:closed, sh:order, sh:group for UI hints
+#          - sh:closed, sh:order, sh:group for UI hints without overwhelming the UI
 # 
 # EXPECTED UI: ObjectType nodes with 
 # - sh:NodeShape badge
-# - Details dialog with collapsible PropertyShape sections and support for nested property shapes
-# - targeting (sh:targetClass, sh:targetObjectsOf)
+# - Details dialog with collapsible PropertyShape sections and support for nesting/breadcrumb-like navigation
+# - targeting (sh:targetClass, sh:targetObjectsOf) and fusion with rdfs:Class into single UI node
+# - subClassOf/broader hierarchy and sh:NodeShape sh:node inheritance when applicable
 ################################################################################
 
 # -----------------------------------------------------------------------------
@@ -27,12 +28,12 @@
 rxyz:Person a rdfs:Class, sh:NodeShape ;
     rdfs:label "Person" ;
     rdfs:comment "A human being who may create, review, or consume content." ;
-    rdfs:subClassOf rxyz:Thing ;
+    rdfs:subClassOf rxyz:Thing ; # Thing is not explicitly defined here, only referenced
     sh:closed false ;  # Show in Details: allows additional properties
     sh:property
         rxyz:Person_email,      # Named PropertyShape
         rxyz:Person_birthDate,  # Named PropertyShape
-        # Blank node PropertyShape (inline)
+        # Blank node PropertyShape
         [ a sh:PropertyShape ;
             sh:path rxyz:name ;
             sh:name "Name" ;
@@ -46,17 +47,49 @@ rxyz:Person a rdfs:Class, sh:NodeShape ;
             sh:message "Person must have a name (1-200 characters)." ;
         ] ,
         # Nested sh:property pattern (multi-level validation)
+        # value in prop:value of the form is itself a new form with properties
+        # this is quite a complex BFO-aligned graph pattern with strong expressivity
+        # visualization is tricky but possible with e.g. nested forms/dialogs, breadcrumb-like navigation, etc.
         [ a sh:PropertyShape ;
-            sh:path rxyz:interest ;
-            sh:name "Interest" ;
+            sh:path rxyz:bearerOf ;
+            sh:name "A person's weight quality" ;
             sh:order 4 ;
-            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:minCount 1 ;
+            sh:maxCount 1 ;
+            sh:class rxyz:WeightQuality ; # specifically dependent continuant (PATO ontology)
+            sh:message "An instance of a person must bear its weight attribute" ;
             sh:property [
-                sh:path rdfs:label ;
-                sh:datatype xsd:string ;
                 sh:minCount 1 ;
-                sh:maxCount 1 ;
-                sh:message "Each interest must have a label." ;
+                sh:path rxyz:hasMeasurement ;
+                sh:class rxyz:MeasurementICE ; # generically dependent continuant; information content entity (IAO ontology)
+                sh:message "Each particular mass quality must have at least one measurement." ;
+                sh:property [
+                    sh:minCount 1 ;
+                    sh:path rxyz:genericallyDependsOn ;
+                    sh:class rxyz:InformationBearingEntity ; # independent continuant (IAO)
+                    sh:message "Each measurement must have at least one information bearing entity." ;
+                    sh:property [
+                        a sh:PropertyShape ;
+                        sh:path rxyz:hasDecimalValue ;
+                        sh:name "Measurement Value" ;
+                        sh:description "Decimal value for the measurement." ;
+                        sh:minCount 1 ;
+                        sh:maxCount 1 ;
+                        sh:datatype xsd:decimal ;
+                        sh:message "Information bearing entity must have exactly one literal value."
+                    ] ;
+                    sh:property [
+                        a sh:PropertyShape ;
+                        sh:path rxyz:unit ;
+                        sh:name "Measurement Unit" ;
+                        sh:description "Unit for the measurement (IRI)." ;
+                        sh:minCount 1 ;
+                        sh:maxCount 1 ;
+                        sh:nodeKind sh:IRI ;
+                        sh:class rxyz:MeasurementUnit ; # descriptive information content entity (IAO)
+                        sh:message "Information bearing entity must have exactly one unit specified (as IRI)."
+                    ] ;
+                ] ;
             ] ;
         ] ;
 .
@@ -110,7 +143,7 @@ rxyz:ValidEmailShape a sh:NodeShape ; # this is a bit odd but it's possible
 .
 
 # -----------------------------------------------------------------------------
-# 2.3 sh:node Nesting Pattern (value must conform to another shape)
+# 2.3 sh:node Nesting Pattern (value must conform to another node shape, dereferenced on the canvas on click)
 # -----------------------------------------------------------------------------
 
 rxyz:Author a rdfs:Class, sh:NodeShape ;

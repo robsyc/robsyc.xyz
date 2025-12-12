@@ -95,3 +95,5 @@
 <DetailsDialog bind:open={detailsOpen} {pointer} {iri} kind="objectType" {flags} />
 <SerializeDialog bind:open={serializeOpen} {pointer} {iri} kind="objectType" />
 <InstancesDialog bind:open={instancesOpen} {pointer} {iri} />
+
+

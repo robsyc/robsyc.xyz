@@ -13,7 +13,7 @@
 # EXPECTED UI: ObjectType nodes with 
 # - rdfs:Class badge only
 # - label and comment along with 3 buttons: Details, Serialize, Instances (dialogs will be rather empty)
-# - toggle buttons to view/unview hierarchy (subClass/broaders)
+# - toggle buttons to view/unview hierarchy (subClassOf/broader)
 ################################################################################
 
 rxyz:Thing a rdfs:Class ;
@@ -37,6 +37,5 @@ rxyz:TechnologyTopic a rdfs:Class ;
 rxyz:WebTopic a rdfs:Class ;
     rdfs:label "Web Topic" ;
     rdfs:comment "Topics related to web technologies." ;
-    rdfs:subClassOf rxyz:TechnologyTopic ;
     skos:broader rxyz:TechnologyTopic ; # Also test SKOS hierarchy
 .

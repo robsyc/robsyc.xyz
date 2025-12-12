@@ -36,7 +36,7 @@ rxyz:creator a owl:ObjectProperty ;
 # NOTE: these domain/range objects are not defined here... 
 # should we still visualize them as owl:Class ObjectType nodes since this is to be inferred?
 # should we apply basic inference in the background or just hard code this into our app logic?
-# perhaps dotted line for inferred nodes/edges, in a seperate graph/store
+# perhaps dotted line for inferred nodes/edges, stored in a seperate graph/triple store
 
 rxyz:about a owl:ObjectProperty ;
     rdfs:label "about" ;
