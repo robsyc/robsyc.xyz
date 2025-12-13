@@ -1,9 +1,9 @@
 /**
  * Type Detection Utilities for RDF Schema Elements
  * 
- * Identifies ObjectTypes and LinkTypes from RDF data:
+ * Identifies ObjectTypes and ObjectProperties from RDF data:
  * - ObjectTypes: rdfs:Class, owl:Class, sh:NodeShape (or combinations)
- * - LinkTypes: owl:ObjectProperty (the relationship), optionally wrapped by sh:PropertyShape
+ * - ObjectProperties: owl:ObjectProperty (relationships between ObjectTypes)
  */
 
 import type { GraphPointer } from 'clownface';
@@ -20,7 +20,7 @@ export interface ObjectTypeFlags {
     isRdfsClass: boolean; // rdfs:Class and not rdf:Property
     isOwlClass: boolean;  // owl:Class (implies isRdfsClass)
     isNodeShape: boolean; // sh:NodeShape
-    // NOTE: sh:ShapeClass implies isRdfsClass and isNodeShape
+    // NOTE: sh:ShapeClass (SHACL 1.2) implies isRdfsClass and isNodeShape
 }
 
 /** Combined result for ObjectType detection */
@@ -30,41 +30,29 @@ export interface ObjectTypeInfo {
     flags: ObjectTypeFlags;
 }
 
-/** Semantic type flags for LinkTypes (relationships connecting ObjectTypes) */
-export interface LinkTypeFlags {
+/** Semantic type flags for ObjectProperties (relationships connecting ObjectTypes) */
+export interface ObjectPropertyFlags {
     isObjectProperty: boolean;  // owl:ObjectProperty
-    hasPropertyShape: boolean;  // Has a wrapping sh:PropertyShape
+    isFunctional: boolean;      // owl:FunctionalProperty
+    isSymmetric: boolean;       // owl:SymmetricProperty
+    isTransitive: boolean;      // owl:TransitiveProperty
+    hasInverse: boolean;        // has owl:inverseOf
+    inverseIri?: string;        // IRI of the inverse property
+    hasPropertyChain: boolean;  // has owl:propertyChainAxiom
 }
 
-/** Info about the wrapping PropertyShape (if any) */
-export interface PropertyShapeInfo {
-    /** IRI of the PropertyShape */
-    shapeIri: string;
-    /** Pointer to the PropertyShape */
-    shapePointer: GraphPointer<NamedNode | BlankNode, Store>;
-    /** sh:node target (the target ObjectType) */
-    nodeTargetIri?: string;
-    /** sh:minCount */
-    minCount?: string;
-    /** sh:maxCount */
-    maxCount?: string;
-    /** sh:message */
-    message?: string;
-}
-
-/** Combined result for LinkType detection */
-export interface LinkTypeInfo {
-    /** Pointer to the ObjectProperty */
+/** Combined result for ObjectProperty detection */
+export interface ObjectPropertyInfo {
     pointer: GraphPointer<NamedNode | BlankNode, Store>;
-    /** IRI of the ObjectProperty */
     iri: string;
-    flags: LinkTypeFlags;
-    /** Info from wrapping PropertyShape (if any) */
-    propertyShape?: PropertyShapeInfo;
-    /** rdfs:domain (from the property itself) */
-    domainIri?: string;
-    /** rdfs:range (from the property itself) */
-    rangeIri?: string;
+    flags: ObjectPropertyFlags;
+    // should we even store this range/domain stuff in the info or just query when needed to display the domain edges?
+    domainIris?: string[]; // rdfs 
+    rangeIris?: string[]; 
+    domainIncludesIris?: string[]; // schema
+    rangeIncludesIris?: string[];
+    /** Pointer to the inverse property (if any) */
+    inversePointer?: GraphPointer<NamedNode | BlankNode, Store>;
 }
 
 /****************************************************************************************
@@ -91,16 +79,34 @@ export function detectObjectType(pointer: GraphPointer<Term, Store>): ObjectType
     };
 }
 
-/** Detect LinkType flags for a given pointer (owl:ObjectProperty) */
-export function detectLinkType(pointer: GraphPointer<Term, Store>): LinkTypeFlags {
+/** Detect ObjectProperty flags for a given pointer */
+export function detectObjectProperty(pointer: GraphPointer<Term, Store>): ObjectPropertyFlags {
     if (!pointer.term) {
-        return { isObjectProperty: false, hasPropertyShape: false };
+        return { 
+            isObjectProperty: false, 
+            isFunctional: false,
+            isSymmetric: false,
+            isTransitive: false,
+            hasInverse: false,
+            hasPropertyChain: false,
+        };
     }
 
-    const hasPropertyShape = pointer.in(ns.sh('path')).value !== undefined;
+    const types = pointer.out(ns.rdf('type')).terms;
+    const typeSet = new Set(types.map(t => t.value));
+    
+    const inversePtr = pointer.out(ns.owl('inverseOf'));
+    const inverseIri = inversePtr.value;
 
-    return { isObjectProperty: true, hasPropertyShape };
-    // ObjectProperty is already checked for in the caller
+    return {
+        isObjectProperty: typeSet.has(ns.owl('ObjectProperty').value),
+        isFunctional: typeSet.has(ns.owl('FunctionalProperty').value),
+        isSymmetric: typeSet.has(ns.owl('SymmetricProperty').value),
+        isTransitive: typeSet.has(ns.owl('TransitiveProperty').value),
+        hasInverse: !!inverseIri,
+        inverseIri,
+        hasPropertyChain: !!pointer.out(ns.owl('propertyChainAxiom')).term, // range is a rdf:List
+    };
 }
 
 /** Check if a resource qualifies as an ObjectType */
@@ -108,8 +114,8 @@ export function isObjectType(flags: ObjectTypeFlags): boolean {
     return flags.isRdfsClass || flags.isOwlClass || flags.isNodeShape;
 }
 
-/** Check if a resource qualifies as a LinkType */
-export function isLinkType(flags: LinkTypeFlags): boolean {
+/** Check if a resource qualifies as an ObjectProperty */
+export function isObjectProperty(flags: ObjectPropertyFlags): boolean {
     return flags.isObjectProperty;
 }
 
@@ -148,9 +154,9 @@ export function findAllObjectTypes(store: RdfStore): ObjectTypeInfo[] {
     return results;
 }
 
-/** Find all LinkTypes in the store (owl:ObjectProperty instances) */
-export function findAllLinkTypes(store: RdfStore): LinkTypeInfo[] {
-    const results: LinkTypeInfo[] = [];
+/** Find all ObjectProperties in the store */
+export function findAllObjectProperties(store: RdfStore): ObjectPropertyInfo[] {
+    const results: ObjectPropertyInfo[] = [];
     const seen = new Set<string>();
 
     const processCandidate = (subject: NamedNode | BlankNode) => {
@@ -159,34 +165,33 @@ export function findAllLinkTypes(store: RdfStore): LinkTypeInfo[] {
         seen.add(iri);
 
         const pointer = store.pointer(iri) as GraphPointer<NamedNode | BlankNode, Store>;
-        const flags = detectLinkType(pointer);
+        const flags = detectObjectProperty(pointer);
 
-        if (isLinkType(flags)) {
+        if (isObjectProperty(flags)) {
             // Get domain/range from the property itself
-            const domainIri = pointer.out(ns.rdfs('domain')).value;
-            const rangeIri = pointer.out(ns.rdfs('range')).value;
-
-            // Find wrapping PropertyShape (if any)
-            let propertyShape: PropertyShapeInfo | undefined;
-            const shapePointers = pointer.in(ns.sh('path')).toArray();
+            const domainIris = pointer.out(ns.rdfs('domain')).values;
+            const rangeIris = pointer.out(ns.rdfs('range')).values;
             
-            for (const shapePtr of shapePointers) {
-                // Check if this shape has sh:node (connects to ObjectType)
-                const nodeTarget = shapePtr.out(ns.sh('node')).value;
-                if (nodeTarget && shapePtr.term) {
-                    propertyShape = {
-                        shapeIri: shapePtr.term.value,
-                        shapePointer: shapePtr as GraphPointer<NamedNode | BlankNode, Store>,
-                        nodeTargetIri: nodeTarget,
-                        minCount: shapePtr.out(ns.sh('minCount')).value,
-                        maxCount: shapePtr.out(ns.sh('maxCount')).value,
-                        message: shapePtr.out(ns.sh('message')).value,
-                    };
-                    break; // Use first PropertyShape with sh:node
-                }
+            // Get schema:domainIncludes/rangeIncludes (weak semantics)
+            const domainIncludesIris = pointer.out(ns.schema('domainIncludes')).values;
+            const rangeIncludesIris = pointer.out(ns.schema('rangeIncludes')).values;
+            
+            // Get inverse pointer if exists
+            let inversePointer: GraphPointer<NamedNode | BlankNode, Store> | undefined;
+            if (flags.inverseIri) {
+                inversePointer = store.pointer(flags.inverseIri) as GraphPointer<NamedNode | BlankNode, Store>;
             }
 
-            results.push({ pointer, iri, flags, propertyShape, domainIri, rangeIri });
+            results.push({ 
+                pointer, 
+                iri, 
+                flags, 
+                domainIris: domainIris.length > 0 ? domainIris : undefined, 
+                rangeIris: rangeIris.length > 0 ? rangeIris : undefined,
+                domainIncludesIris: domainIncludesIris.length > 0 ? domainIncludesIris : undefined,
+                rangeIncludesIris: rangeIncludesIris.length > 0 ? rangeIncludesIris : undefined,
+                inversePointer,
+            });
         }
     };
 
@@ -214,10 +219,12 @@ export function getObjectTypeBadges(flags: ObjectTypeFlags): string[] {
     return badges;
 }
 
-/** Get semantic badges for a LinkType */
-export function getLinkTypeBadges(flags: LinkTypeFlags): string[] {
+/** Get semantic badges for an ObjectProperty */
+export function getObjectPropertyBadges(flags: ObjectPropertyFlags): string[] {
     const badges: string[] = [];
     if (flags.isObjectProperty) badges.push('owl:ObjectProperty');
-    if (flags.hasPropertyShape) badges.push('sh:PropertyShape');
+    if (flags.isFunctional) badges.push('Functional');
+    if (flags.isSymmetric) badges.push('Symmetric');
+    if (flags.isTransitive) badges.push('Transitive');
     return badges;
 }

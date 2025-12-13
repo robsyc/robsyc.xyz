@@ -3,7 +3,8 @@
      * SerializeDialog - RDF Serialization View
      * 
      * Extracts and displays quads for the resource in Turtle format.
-     * For LinkTypes with a PropertyShape, includes the shape's triples too.
+     * For ObjectTypes: includes sh:property shapes if NodeShape.
+     * For ObjectProperties: includes related shapes.
      */
     import { Writer, type Quad } from 'n3';
     import * as Dialog from "$lib/components/ui/dialog/index.js";
@@ -16,18 +17,16 @@
     import type { NamedNode, BlankNode } from '@rdfjs/types';
     import type { Store } from 'n3';
     import { ns } from '$lib/stores/rdf.svelte';
-    import type { PropertyShapeInfo } from '$lib/rdf/type-detection';
     import { getCompactURI } from '$lib/rdf/utils';
 
     interface Props {
         open: boolean;
         pointer: GraphPointer<NamedNode | BlankNode, Store>;
         iri: string;
-        kind: 'objectType' | 'linkType';
-        propertyShape?: PropertyShapeInfo;
+        kind: 'objectType' | 'objectProperty';
     }
 
-    let { open = $bindable(), pointer, iri, kind, propertyShape }: Props = $props();
+    let { open = $bindable(), pointer, iri, kind }: Props = $props();
     let copied = $state(false);
     
     const PREFIXES: Record<string, string> = {
@@ -38,7 +37,7 @@
         sh: 'http://www.w3.org/ns/shacl#',
         skos: 'http://www.w3.org/2004/02/skos/core#',
         schema: 'https://schema.org/',
-        rxyz: 'http://rosyc.xyz#',
+        rxyz: 'http://robsyc.xyz/',
     };
     
     function extractQuads(): Quad[] {
@@ -54,33 +53,35 @@
             if (!seen.has(key)) { seen.add(key); quads.push(q); }
         };
         
+        // Recursively add quads for blank nodes
+        const addBlankNodeQuads = (bn: any, depth = 0) => {
+            if (depth > 5) return; // Prevent infinite recursion
+            for (const bnQ of dataset.match(bn, null, null, null)) {
+                addQuad(bnQ as Quad);
+                if ((bnQ as Quad).object.termType === 'BlankNode') {
+                    addBlankNodeQuads((bnQ as Quad).object, depth + 1);
+                }
+            }
+        };
+        
         // Direct outgoing triples from the resource
         for (const q of dataset.match(subject as any, null, null, null)) {
             addQuad(q as Quad);
             if (q.object.termType === 'BlankNode') {
-                for (const bnQ of dataset.match(q.object as any, null, null, null)) {
-                    addQuad(bnQ as Quad);
-                }
+                addBlankNodeQuads(q.object);
             }
         }
         
-        // For ObjectTypes: include sh:property targets
+        // For ObjectTypes: include sh:property targets (PropertyShapes)
         if (kind === 'objectType') {
             for (const propPtr of pointer.out(ns.sh('property')).toArray()) {
                 if (propPtr.term) {
                     for (const q of dataset.match(propPtr.term as any, null, null, null)) {
                         addQuad(q as Quad);
+                        if (q.object.termType === 'BlankNode') {
+                            addBlankNodeQuads(q.object);
+                        }
                     }
-                }
-            }
-        }
-        
-        // For LinkTypes: include the wrapping PropertyShape
-        if (kind === 'linkType' && propertyShape?.shapePointer) {
-            const shapeSubject = propertyShape.shapePointer.term;
-            if (shapeSubject) {
-                for (const q of dataset.match(shapeSubject as any, null, null, null)) {
-                    addQuad(q as Quad);
                 }
             }
         }
@@ -130,5 +131,3 @@
         </div>
     </Dialog.Content>
 </Dialog.Root>
-
-

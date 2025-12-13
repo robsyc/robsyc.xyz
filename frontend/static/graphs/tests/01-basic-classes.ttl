@@ -37,5 +37,6 @@ rxyz:TechnologyTopic a rdfs:Class ;
 rxyz:WebTopic a rdfs:Class ;
     rdfs:label "Web Topic" ;
     rdfs:comment "Topics related to web technologies." ;
+    rdfs:subClassOf rxyz:Topic ;
     skos:broader rxyz:TechnologyTopic ; # Also test SKOS hierarchy
 .

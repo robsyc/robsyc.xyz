@@ -13,8 +13,9 @@
 </script>
 
 <!-- Full-width header with centered navigation -->
-<header class="fixed top-0 left-0 right-0 w-full z-40 flex justify-center pt-4 lg:pt-6">
-	<nav class="bg-background border border-border rounded-full shadow-sm flex items-center overflow-hidden">
+<!-- pointer-events-none on header allows clicks to pass through, pointer-events-auto on nav makes it clickable -->
+<header class="fixed top-0 left-0 right-0 w-full z-40 flex justify-center pt-4 lg:pt-6 pointer-events-none">
+	<nav class="bg-background border border-border rounded-full shadow-sm flex items-center overflow-hidden pointer-events-auto">
 		
 		<div class="px-4 py-2">
 			<a href="/" class="font-mono text-lg hover:opacity-80">robsyc.xyz</a>
