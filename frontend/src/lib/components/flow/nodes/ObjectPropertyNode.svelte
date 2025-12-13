@@ -176,3 +176,4 @@
 <SerializeDialog bind:open={serializeOpen} pointer={activePointer} iri={activeIri} kind="objectProperty" />
 <InstancesDialog bind:open={instancesOpen} pointer={activePointer} iri={activeIri} />
 
+
