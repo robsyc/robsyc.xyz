@@ -1,0 +1,115 @@
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rxyz: <http://robsyc.xyz/> .
+
+################################################################################
+# TEST 02: Simple SHACL Shapes
+# 
+# PURPOSE: Test basic NodeShape detection and PropertyShape handling
+#          - sh:ShapeClass pattern (rdfs:Class + sh:NodeShape)
+#          - Only direct predicate paths (no sequence/alternative)
+#          - Named PropertyShapes (minimal blank nodes)
+#          - Basic constraints: sh:datatype, sh:minCount, sh:maxCount
+#          - sh:targetClass linking pure shapes to classes
+# 
+# EXPECTED UI:
+# - ObjectType nodes with rdfs:Class + sh:NodeShape badges
+# - Details dialog with collapsible PropertyShape sections that shows constraints and metadata
+# - targetClass edges shown as dashed connections
+################################################################################
+
+# -----------------------------------------------------------------------------
+# ShapeClass Pattern: rdfs:Class + sh:NodeShape combined
+# This is the SHACL 1.2 recommended pattern
+# -----------------------------------------------------------------------------
+
+rxyz:Person a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being." ;
+    rdfs:subClassOf rxyz:Thing ;
+    sh:property
+        rxyz:Person_name,
+        rxyz:Person_email,
+        rxyz:Person_age .
+
+# Named PropertyShapes (easier to reference and maintain)
+rxyz:Person_name a sh:PropertyShape ;
+    sh:path rxyz:name ;
+    sh:name "Name" ;
+    sh:description "The full name of the person." ;
+    sh:order 1 ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 .
+
+rxyz:Person_email a sh:PropertyShape ;
+    sh:path rxyz:email ;
+    sh:name "Email" ;
+    sh:description "Contact email address." ;
+    sh:order 2 ;
+    sh:datatype xsd:string ;
+    sh:minCount 0 ;
+    sh:pattern "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" ;
+    sh:message "Email address must be a valid email format (e.g., user@example.com)" .
+
+rxyz:Person_age a sh:PropertyShape ;
+    sh:path rxyz:age ;
+    sh:name "Age" ;
+    sh:description "Age in years." ;
+    sh:order 3 ;
+    sh:datatype xsd:integer ;
+    sh:maxCount 1 ;
+    sh:minInclusive 0 ;
+    sh:maxInclusive 150 .
+
+# -----------------------------------------------------------------------------
+# Another ShapeClass with subclass relationship
+# -----------------------------------------------------------------------------
+
+rxyz:Author a rdfs:Class, sh:NodeShape ;
+    rdfs:label "Author" ;
+    rdfs:comment "A person who writes content." ;
+    rdfs:subClassOf rxyz:Person ;
+    sh:property
+        rxyz:Author_biography .
+
+rxyz:Author_biography a sh:PropertyShape ;
+    sh:path rxyz:biography ;
+    sh:name "Biography" ;
+    sh:description "Short biography of the author." ;
+    sh:datatype xsd:string ;
+    sh:maxLength 2000 ;
+    sh:maxCount 1 .
+
+# -----------------------------------------------------------------------------
+# Pure NodeShape (validation only, not a class)
+# Uses sh:targetClass to link to an existing class + blank nodes
+# -----------------------------------------------------------------------------
+
+rxyz:ArticleShape a sh:NodeShape ;
+    rdfs:label "Article Shape" ;
+    rdfs:comment "Validation shape for articles." ;
+    sh:targetClass rxyz:Article ;
+    sh:property [
+        sh:path rxyz:title ;
+        sh:name "Title" ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:maxLength 200 ;
+    ] , [
+        sh:path rxyz:wordCount ;
+        sh:name "Word Count" ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 1 ;
+        sh:maxCount 1 ;
+    ] .
+
+# Target class for the shape above
+rxyz:Article a rdfs:Class ;
+    rdfs:label "Article" ;
+    rdfs:comment "A written composition." ;
+    rdfs:subClassOf rxyz:Thing .

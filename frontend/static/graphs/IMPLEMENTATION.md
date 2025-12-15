@@ -141,7 +141,7 @@ function detectObjectType(pointer: GraphPointer): ObjectTypeFlags {
 
 For toggle functionality, we're not yet sure if we should store it here, or higher up in the flow mapping logic / componentry.
 
-### ObjectProperty Detection (WIP)
+### ObjectProperty Detection
 
 ```typescript
 interface ObjectPropertyFlags {
@@ -171,7 +171,7 @@ function detectObjectProperty(pointer: GraphPointer): ObjectPropertyFlags {
 
 In effect, for both types of entities, we want a manageable but flexible set of flags to manage dynamic behavior, pointer traversal and UI presentation.
 
-### Finding All ObjectTypes/Properties (WIP)
+### Finding All ObjectTypes/Properties
 
 Possibly we should use distinct RDF graphs for ontology schema vs. instance data vs. inferred data vs. etc.
 
@@ -405,7 +405,7 @@ Features:
 - Copy to clipboard
 - **Future**: In-place editing that updates the RDF graph upon submission (possibly validation feedback, inference preview, ...) in a nice editor with syntax highlighting, auto-completion like Cursor, etc.
 
-### InstancesDialog
+### InstancesDialog (not yet started)
 
 Features:
 - Query instances: `?s rdf:type :ThisClass` or `?s :thisProperty ?o`
@@ -476,60 +476,6 @@ function pathToString(pathPtr: GraphPointer): string {
 
 ---
 
-## Implementation Phases
-
-### Phase 1: Core Detection & Basic Nodes
-
-**Files to modify:**
-- `type-detection.ts`: Update ObjectType/ObjectProperty detection
-- `flow-mapper.ts`: Rename LinkType → ObjectProperty, consolidate inverses
-- `ObjectTypeNode.svelte`: Update existing, add conditional badges and new features
-- Rename `LinkTypeNode.svelte` → `ObjectPropertyNode.svelte` and update it to new semantics
-
-**Test with:** `01-basic-classes.ttl`, `04-object-properties.ttl`
-
-### Phase 2: SHACL PropertyShape Display
-
-**Files to modify:**
-- `DetailsDialog.svelte`: Add PropertyShape extraction and display (possibly nested field)
-- Add PropertyShape parsing utilities and mapping to shadcn Item(viewer)/Field(editor) components
-
-**Test with:** `02-shacl-shapes.ttl`
-
-### Phase 3: OWL Constructs
-
-**Files to modify:**
-- `type-detection.ts`: Add OWL restriction detection (possibly also extra utils; our "clownface-owl")
-- `DetailsDialog.svelte`: Add OWL-specific sections
-
-**Test with:** `03-owl-classes.ttl`
-
-### Phase 4: Complex SHACL Paths
-
-**Files to modify:**
-- Add path parsing utilities using `clownface-shacl-path`
-- Update PropertyShape display for complex paths
-
-**Test with:** `05-complex-paths.ttl`
-
-### Phase 5: Instance Handling
-
-**Files to modify:**
-- `InstancesDialog.svelte`: Implement instance queries
-- Node/Edge componentry (edges between objects)
-- Add form generation from SHACL shapes (using SHACL-UI spec)
-
-**Test with:** `06-instances.ttl`
-
-### Phase 6: Editing Features
-
-**Files to modify:**
-- `SerializeDialog.svelte`: Add edit mode
-- `DetailsDialog.svelte`: Add CRUD operations
-- Update `RdfStore` for reactive updates
-
----
-
 ## Key References
 
 ### Specifications
@@ -592,3 +538,7 @@ Based on [SHACL 1.2 UI Working Draft](https://w3c.github.io/data-shapes/shacl12-
 3. **sh:order and sh:group**: Use for consistent property ordering in instances' Details dialog
 4. **View vs Edit Mode**: Specify viewer and editor for mapping to UI components for
 5. **Label Resolution**: Use rdfs:label, sh:name, or generate from local name
+
+## Extra
+
+Once a user has created a model and instance data for it, they will want to deploy it to a production environment. In later iterations we will want to implement a way to expose the model and instances through an API with SPARQL, GraphQL, semantic search, agentic tools, reasoning runs, etc.

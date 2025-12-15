@@ -14,7 +14,7 @@
 
 <!-- Full-width header with centered navigation -->
 <!-- pointer-events-none on header allows clicks to pass through, pointer-events-auto on nav makes it clickable -->
-<header class="fixed top-0 left-0 right-0 w-full z-40 flex justify-center pt-4 lg:pt-6 pointer-events-none">
+<!-- <header class="fixed top-0 left-0 right-0 w-full z-40 flex justify-center pt-4 lg:pt-6 pointer-events-none">
 	<nav class="bg-background border border-border rounded-full shadow-sm flex items-center overflow-hidden pointer-events-auto">
 		
 		<div class="px-4 py-2">
@@ -30,7 +30,6 @@
 				<span class="sr-only">Toggle theme</span>
 			</Button>
 
-			<!-- Social Media Links - https://icons.getbootstrap.com/ -->
 			<Button variant="outline" size="icon" class="rounded-none h-full border-none dark:bg-background" 
 			href="https://www.linkedin.com/in/robbe-claeys-161595157/" target="_blank" rel="noopener noreferrer">
 				<svg xmlns="http://www.w3.org/2000/svg" width="1.2rem" height="1.2rem" fill="currentColor" viewBox="0 0 16 16">
@@ -47,6 +46,6 @@
 			</Button>
 		</div>
 	</nav>
-</header>
+</header> -->
 
 {@render children()}

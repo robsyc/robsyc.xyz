@@ -1,42 +1,52 @@
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix rxyz: <http://robsyc.xyz/> .
 
 ################################################################################
-# TEST: Basic rdfs:Class (no OWL, no SHACL)
+# TEST 01: Basic rdfs:Class Hierarchy
 # 
-# PURPOSE: Test simple class hierarchy visualization
-# EXPECTED UI: ObjectType nodes with 
-# - rdfs:Class badge only
-# - label and comment along with 3 buttons: Details, Serialize, Instances (dialogs will be rather empty)
-# - toggle buttons to view/unview hierarchy (subClassOf/broader)
+# PURPOSE: Test simple class hierarchy visualization with root detection
+# 
+# STRUCTURE: 4-level hierarchy with clear root node
+#   rxyz:Thing (ROOT - no parents)
+#     └── rxyz:Topic (subClassOf Thing)
+#           ├── rxyz:TechnologyTopic (subClassOf Topic)
+#           │     └── rxyz:WebTopic (subClassOf TechnologyTopic)
+#           └── rxyz:ContentTopic (subClassOf Topic)
+# 
+# EXPECTED UI:
+# - ObjectType nodes with rdfs:Class badge only
+# - Progressive rendering: Thing visible initially, expand via toggles
+# - Hierarchy edges via rdfs:subClassOf and skos:broader (subclass implies broader)
 ################################################################################
 
+# Level 0: Root class (no parents)
 rxyz:Thing a rdfs:Class ;
-    rdfs:label "Thing" ;
-    rdfs:comment "The root class for all entities in the domain." ;
-.
+    rdfs:label "Thing"@en ;
+    rdfs:label "Ding"@nl ;
+    rdfs:comment "The root class for all entities." .
 
+# Level 1: Direct child of Thing
 rxyz:Topic a rdfs:Class ;
     rdfs:label "Topic" ;
     rdfs:comment "A subject or theme used to categorize content." ;
-    rdfs:subClassOf rxyz:Thing ;
-.
+    rdfs:subClassOf rxyz:Thing .
 
-# Test: Multiple levels of subclass hierarchy
+# Level 2: Children of Topic
 rxyz:TechnologyTopic a rdfs:Class ;
     rdfs:label "Technology Topic" ;
     rdfs:comment "Topics related to technology." ;
-    rdfs:subClassOf rxyz:Topic ;
-.
+    rdfs:subClassOf rxyz:Topic .
 
+rxyz:ContentTopic a rdfs:Class ;
+    rdfs:label "Content Topic" ;
+    rdfs:comment "Topics related to content creation." ;
+    rdfs:subClassOf rxyz:Topic .
+
+# Level 3: Child of TechnologyTopic
 rxyz:WebTopic a rdfs:Class ;
     rdfs:label "Web Topic" ;
     rdfs:comment "Topics related to web technologies." ;
-    rdfs:subClassOf rxyz:Topic ;
-    skos:broader rxyz:TechnologyTopic ; # Also test SKOS hierarchy
-.
+    rdfs:subClassOf rxyz:TechnologyTopic ;
+    skos:broader rxyz:TechnologyTopic .  # Also test SKOS hierarchy

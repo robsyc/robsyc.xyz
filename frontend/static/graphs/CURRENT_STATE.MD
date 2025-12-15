@@ -1,51 +1,87 @@
-# Current state
+# Current State
 
-We have revisited the core semantics (phase 1). 
+## ✅ Working Features + NOTES
 
-`01-basic-classes.ttl`
+### Data Layer
+- N3.js RDF store with reactive Svelte 5 state
+- Clownface pointers for graph traversal
+- Load RDF from URL or test files
 
-We have basic rendering of Classes with badge, label, etc.
-- lock button but it has no real use since we need to tackle **step-wise rendering**
-- a lot can be improved for the layout
-    - make label click to open toolbar for: copy IRI, copy label, ...
-    - the selected border (square) doesn't match the node
-    - 3 bottom buttons should nicely fit in bottom part of the node, aligned with the rounded sides with, in full "Details", "Serialize", "Instances" with icon
-- Hide/show children does not work, our current approach is rendering all nodes & edges at once. We want a more progressive presentation
-- Nodes render stacked top to bottom, close by each other. We want to use a nicer automatic placement of nodes to make sure the hierarchy is clear and pleasant to look at => https://svelteflow.dev/examples/layout/dagre
+NOTE: we don't have 2-way communication; interactions with the flow don't alter the RDF triples in the store.
 
-`04-object-properties.ttl`
+### Visualization
+- SvelteFlow canvas with ObjectType and ObjectProperty nodes => these are okay but updating UI is still on the TODO
+- **ELK-powered automatic layout** tree (and in the future force-directed) node placement
+- **Progressive rendering and incremental updates** - starts with root nodes, expand/collapse via toggle
+- Hierarchy edges (rdfs:subClassOf, skos:broader)
+- Domain/range edges for ObjectProperties
 
-This test file should be split up. We should begin with just a simple set of ObjectProperties with hierarcy and domain/range(Includes), no owl inverse, property chain, etc.
-Currently we show domain and range inside the node in the UI. Instead we only want to show this in the details dialog, and when clicking toggle on the sides to show domain/range(Includes) as edges that go to ObjectType classes. This also brings us back to the discussion of showing edges only when needed and making the UI more responsive. 
+The goal is for hierarcy (i.e., broader/subClassOf/subPropertyOf) to be visualized as a top-down tree layout, while the links between Classes should go **through object property nodes** (as domain/range edges).
 
-Tests:
- 1. Object type, rdfs:Class
- 2. Object type, simple sh:NodeShape (only direct and inverse property) and combination with rdfs:Class
- 3. Simple object properties with hierarcy and domain/range(Includes) with present rdfs:Class
- 4. More complex shacl shapes with sh:node, nested sh:property, alternative/sequence/... predicate paths
- 5. Owl classes with restrictions, equivalence, disjointness
- 6. Fully fledged owl:ObjectProperty with characteristics and property chain
- 7. Instance data and possibly SHACL-UI hints for form presentation
+### Node Components
+- **ObjectTypeNode**: stadium shape, type badges, expand/collapse children, lock toggle
+- **ObjectPropertyNode**: dashed border, inverse toggle, characteristic badges
+- Details, Serialize, Instances dialogs (lazy computed via $derived.by)
 
-We want to make the tests cumulative. We should be able to add triples to the store incrementally. For this and progressive rendering, we could look towards our FastAPI backend and Tentris SPARQL-backed triplestore. This will introduce a lot more complexity but it could help us unblock.
+### Type Detection
+- rdfs:Class, owl:Class, sh:NodeShape detection
+- owl:ObjectProperty with characteristics (Functional, Symmetric, Transitive)
+- **Root detection** for progressive rendering (isRoot flag) # TODO thiss WIP to decide what to render on first load
 
----
+### Visibility Store
+- Progressive disclosure: start with root nodes only
+- Expand/collapse: toggle children visibility
+- Lock: keep specific nodes visible during collapse
+- Version tracking for efficient reactive updates # TODO should check if this is as efficient as we can get it with Svelte 5
 
-Our overarching goals for this sprint are
-- improve presentation and flow layout
-- more responsive piece-by-piece visualization of semantics
-- lay good foundations for future, more complex model development
+## 📁 Test Files
 
----
+| File | Purpose |
+|------|---------|
+| `01-basic-classes.ttl` | Clean 4-level rdfs:Class hierarchy |
+| `02-simple-shacl.ttl` | ShapeClass pattern, simple PropertyShapes, targetClass |
+| `03-simple-properties.ttl` | Simple ObjectProperties, inverse pair, subPropertyOf, broader, domain/range(Includes) |
+| TODO: `04-complex-shacl.ttl` | Complex SHACL shapes and predicate paths, nested PropertyShapes, sh:node, targetObjectsOf |
+| TODO: `05-owl-classes.ttl` | OWL classes with advanced constructs, equivalentClass, disjointWith, Restriction |
+| TODO: `06-owl-properties.ttl` | Advanced: property chains, all characteristics |
+| TODO: `07-instances.ttl` | Instance data, UI/UX infromed by ontology data |
+
+### NOTES PER TEST FILE
+
+#### `01-basic-classes.ttl`
+
+We should create custom SvelteFlow handles and edge components for the different kinds of semantics we're expressing, in this case hierarchy between classes: rdfs:subClassOf, skos:broader where the former implies the latter. E.g., HierarchyEdge and HierarchyHandle. We should make it possible for a user to invert the UI of nodes so that hierachy can be expressed top-down or bottom-up. This should be reflected in the layout algorithm, node handles and edges.
+
+The UI of the ObjectTypeNode can be improved by
+- making the edge toggle button part of the handle component (see SvelteFlow API)
+- double click hierarcy toggle to expand/collapse all children
+- right click hierarchy toggle to open menu with options (e.g. invert hierarchy)
+- do not show IRI in full, instead the label is a button to open a tooltip with options to copy full URI/compact URI/local name (label), ... (make future proof)
+- left-align text in label and comment
+- action buttons should together cover the entire bottom portion of the stadium-shaped node
+- improve placement of badges and click to copy IRI of e.g. rdfs:Class, sh:NodeShape
+- using the **shadcn-svelte Item component** and other components to build the node UI more effectively and consistently
+- create custom SvelteFlow handles that are more intuitive and aligned with the semantics (hierarchy vs. relation)
+- details dialog should be presented more information-dense, the current approach will get very full and confusing quickly as nodes have more attributes, it might be helpful to document the desired contents of the dialogs for objTypes/Props better
 
 
-Use this document to express the current state of the implementation
-- what is implemented / working
-- minor improvements that could be made (e.g. visual improvements)
-- issues and bugs that need to be fixed
-- shortcuts that have been taken and should be revisited
-- technical debt and areas for refactoring
-- architectural blockers that need to be addressed (over next few sprints)
-- feature extensions
+#### `02-simple-shacl.ttl`
 
-This document is a living document that should also be used to guide the development and update the IMPLEMENTATION.md document.
+Extra notes on UI:
+- targetClass edges should be shown similar to the hierarchy edges, i.e., as thick lines connecting top handle of NodeShape with bottom handle of Class node but dashed (and with an arrow pointing to the Class node)
+- ideally we can style our node handles and edges such that it is clear what they describe without having to print out "targetClass" or "subClassOf" etc. the handle itself can then also serve as the toggle button making the UI more zen
+- the SHACL properties in the dialog already look quite nice but I think we will have to move to a sub-dialog approach where the user can click on a property to see more details like validation message, metadata, etc. as we also want to allow the user to edit these down the line. Supporting nested shapes and more complex predicate paths will also not work without revising this (test 4).
+
+#### `03-simple-properties.ttl`
+
+In our node-based UI there is an important distinction between
+- vertical connections (which express hierarcy)
+    i.e., rdfs:subClassOf, skos:broader, rdfs:subPropertyOf
+    we want to visualize this as thick lines forming a tree layout connecting parents to children using a circular icon in the handle of the parent node with chevrons (lucide icons)
+- horizontal ones (which express object property relations)
+    e.g., :Person -domain-[authorOf]-range-> :CreativeWork
+    we want to visualize this as animated lines connecting the sides of UI nodes
+
+This distinction should be 
+- incorporated into the UI design for a clean and intuitive experience
+- used to inform the layout/positioning algorithm (e.g., place child class in direction of the hierarchy, far enough but not too far and not overlapping with other nodes etc.)

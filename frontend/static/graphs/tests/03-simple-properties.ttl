@@ -1,0 +1,108 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix schema: <https://schema.org/> .
+@prefix rxyz: <http://robsyc.xyz/> .
+
+################################################################################
+# TEST 03: Simple Object Properties
+# 
+# PURPOSE: Test owl:ObjectProperty detection and basic characteristics
+#          - Simple domain/range declarations
+#          - Property hierarchy (rdfs:subPropertyOf)
+#          - One inverse pair (owl:inverseOf)
+#          - schema:domainIncludes/rangeIncludes (weak semantics)
+#          - NO property chains or advanced characteristics yet
+# 
+# EXPECTED UI:
+# - ObjectProperty nodes with owl:ObjectProperty badge
+# - Domain/range edges connecting to ObjectType nodes
+# - Inverse toggle on property nodes with owl:inverseOf
+# - Property hierarchy via subPropertyOf edges
+################################################################################
+
+# -----------------------------------------------------------------------------
+# Supporting Classes (for domain/range connections)
+# -----------------------------------------------------------------------------
+
+rxyz:Thing a rdfs:Class ;
+    rdfs:label "Thing" ;
+    rdfs:comment "The root class." .
+
+rxyz:Person a rdfs:Class ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being." ;
+    rdfs:subClassOf rxyz:Thing .
+
+rxyz:Organization a rdfs:Class ;
+    rdfs:label "Organization" ;
+    rdfs:comment "An organized group of people." ;
+    rdfs:subClassOf rxyz:Thing .
+
+rxyz:CreativeWork a rdfs:Class ;
+    rdfs:label "Creative Work" ;
+    rdfs:comment "A creative or intellectual work." ;
+    rdfs:subClassOf rxyz:Thing .
+
+# -----------------------------------------------------------------------------
+# Simple ObjectProperty with domain/range
+# -----------------------------------------------------------------------------
+
+rxyz:creator a owl:ObjectProperty ;
+    rdfs:label "creator" ;
+    rdfs:comment "The agent who created this resource." ;
+    rdfs:domain rxyz:CreativeWork ;
+    rdfs:range rxyz:Person .
+
+rxyz:about a owl:ObjectProperty ;
+    rdfs:label "about" ;
+    rdfs:comment "The subject matter of a creative work." ;
+    rdfs:domain rxyz:CreativeWork .
+    # No range specified - intentionally open
+
+# -----------------------------------------------------------------------------
+# Inverse Property Pair
+# UI: Show as single node with toggle between authorOf ↔ hasAuthor view
+# -----------------------------------------------------------------------------
+
+rxyz:authorOf a owl:ObjectProperty ;
+    rdfs:label "author of" ;
+    rdfs:comment "Relates a person to works they have written." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:CreativeWork ;
+    owl:inverseOf rxyz:hasAuthor .
+
+rxyz:hasAuthor a owl:ObjectProperty ;
+    rdfs:label "has author" ;
+    rdfs:comment "The author of a creative work." ;
+    rdfs:domain rxyz:CreativeWork ;
+    rdfs:range rxyz:Person ;
+    owl:inverseOf rxyz:authorOf .
+
+# -----------------------------------------------------------------------------
+# Property Hierarchy (rdfs:subPropertyOf)
+# -----------------------------------------------------------------------------
+
+rxyz:memberOf a owl:ObjectProperty ;
+    rdfs:label "member of" ;
+    rdfs:comment "The person is a member of this organization." ;
+    rdfs:domain rxyz:Person ;
+    rdfs:range rxyz:Organization .
+
+rxyz:worksFor a owl:ObjectProperty ;
+    rdfs:label "works for" ;
+    rdfs:comment "Employment relationship (subproperty of memberOf)." ;
+    rdfs:domain rxyz:Person ; # this could be an inferred triple
+    rdfs:range rxyz:Organization ;
+    rdfs:subPropertyOf rxyz:memberOf .
+
+# -----------------------------------------------------------------------------
+# schema.org style weak semantics (domainIncludes/rangeIncludes)
+# Shown with dashed edges
+# -----------------------------------------------------------------------------
+
+rxyz:mentions a owl:ObjectProperty ;
+    rdfs:label "mentions" ;
+    rdfs:comment "A resource mentions another resource." ;
+    schema:domainIncludes rxyz:CreativeWork, rxyz:Person ;
+    schema:rangeIncludes rxyz:Person, rxyz:Organization, rxyz:Thing .
