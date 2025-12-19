@@ -25,6 +25,8 @@ export interface ObjectTypeNodeData {
     pointer: GraphPointer<NamedNode | BlankNode, Store>;
     iri: string;
     flags: ObjectTypeFlags;
+    /** True if this type has no parents (root node for progressive rendering) */
+    isRoot: boolean;
 }
 
 export interface ObjectPropertyNodeData {
@@ -39,11 +41,19 @@ export interface ObjectPropertyNodeData {
     rangeIncludesIris?: string[];
     /** Pointer to inverse property */
     inversePointer?: GraphPointer<NamedNode | BlankNode, Store>;
+    /** True if this property has no parent properties (root for progressive rendering) */
+    // NOTE: visualizing all ObjectProperties on the UI can get overwhelming quickly since
+    // - typically not as hierarchically structured as ObjectTypes
+    // - domain/range edges wire everything up, creating a hairball of edges
+    // So this might not be the best approach...
+    isRoot: boolean;
 }
 
 export interface FlowMapperResult {
     nodes: Node[];
     edges: Edge[];
+    /** IDs of root ObjectType nodes (no parents) for progressive rendering */
+    rootNodeIds: string[];
 }
 
 /****************************************************************************************
@@ -84,21 +94,6 @@ function getPosition(
     };
 }
 
-/****************************************************************************************
- * Edge Predicates
- * NOTE: down the line we want to add more predicates (e.g. sh:node), toggle edge visibility
- * and handle this more granularly e.g.
- * - strict sh:NodeShape should not have subClassOf, only broader
- */
-
-const OBJECT_TO_OBJECT_PREDICATES = [
-    { pred: ns.rdfs('subClassOf'), label: 'subClassOf', type: 'subClassOf' as EdgeType },
-    { pred: ns.skos('broader'), label: 'broader', type: 'broader' as EdgeType },
-];
-
-const PROPERTY_TO_PROPERTY_PREDICATES = [
-    { pred: ns.rdfs('subPropertyOf'), label: 'subPropertyOf', type: 'subPropertyOf' as EdgeType },
-];
 
 /****************************************************************************************
  * Main Mapper
@@ -112,6 +107,7 @@ export function mapRdfToFlow(store: RdfStore): FlowMapperResult {
     const edges: Edge[] = [];
     const nodeIds = new Set<string>();
     const edgeIds = new Set<string>();
+    const rootNodeIds: string[] = [];
 
     // Create ObjectType nodes
     const objectTypes = findAllObjectTypes(store);
@@ -124,9 +120,15 @@ export function mapRdfToFlow(store: RdfStore): FlowMapperResult {
                 pointer: info.pointer, 
                 iri: info.iri, 
                 flags: info.flags,
+                isRoot: info.isRoot,
             } as unknown as Record<string, unknown>,
         });
         nodeIds.add(info.iri);
+        
+        // Track root nodes for progressive rendering
+        if (info.isRoot) {
+            rootNodeIds.push(info.iri);
+        }
     });
 
     // Create ObjectProperty nodes (consolidate inverse pairs)
@@ -154,23 +156,75 @@ export function mapRdfToFlow(store: RdfStore): FlowMapperResult {
                 domainIncludesIris: info.domainIncludesIris,
                 rangeIncludesIris: info.rangeIncludesIris,
                 inversePointer: info.inversePointer,
+                isRoot: info.isRoot,
             } as unknown as Record<string, unknown>,
         });
         nodeIds.add(info.iri);
+        
+        // Track root properties for progressive rendering
+        if (info.isRoot) {
+            rootNodeIds.push(info.iri);
+        }
     });
 
-    // Helper to create edges
+    /**
+     * Get edge styling based on edge type
+     * - Hierarchy edges: solid, thicker stroke
+     * - Domain/Range edges: animated, thinner stroke  
+     * - Weak semantics (Includes): dashed, animated
+     * - targetClass: dashed, like hierarchy
+     */
+    const getEdgeStyle = (edgeType: EdgeType): { style?: string } => {
+        switch (edgeType) {
+            // Hierarchy edges - solid, prominent
+            case 'subClassOf':
+            case 'subPropertyOf':
+                return { style: 'stroke-width: 2px' };
+            case 'broader':
+                return { style: 'stroke-width: 2px; opacity: 0.7' };
+            // Domain/range - thinner, for horizontal flow
+            case 'domain':
+            case 'range':
+                return { style: 'stroke-width: 1.5px' };
+            // Weak semantics - dashed
+            case 'domainIncludes':
+            case 'rangeIncludes':
+                return { style: 'stroke-width: 1.5px; stroke-dasharray: 4 2; opacity: 0.8' };
+            // Shape targeting
+            case 'targetClass':
+                return { style: 'stroke-width: 2px; stroke-dasharray: 5 3' };
+            case 'shNode':
+                return { style: 'stroke-width: 1.5px; stroke-dasharray: 3 2' };
+            default:
+                return {};
+        }
+    };
+
+    // Helper to create edges with semantic handle connections
     const addEdge = (
         source: string, 
         target: string, 
         label: string, 
         edgeType: EdgeType,
-        options?: { animated?: boolean; style?: string }
+        options?: { 
+            animated?: boolean; 
+            style?: string;
+            sourceHandle?: 'top' | 'bottom' | 'left' | 'right';
+            targetHandle?: 'top' | 'bottom' | 'left' | 'right';
+        }
     ) => {
         if (!nodeIds.has(source) || !nodeIds.has(target) || source === target) return;
         const id = `${source}-${edgeType}-${target}`;
         if (edgeIds.has(id)) return;
         edgeIds.add(id);
+        
+        // Get base styling for this edge type
+        const baseStyle = getEdgeStyle(edgeType);
+        // Merge with any custom style options
+        const mergedStyle = options?.style 
+            ? `${baseStyle.style || ''}; ${options.style}`.trim().replace(/^;/, '')
+            : baseStyle.style;
+        
         edges.push({ 
             id, 
             source, 
@@ -178,77 +232,130 @@ export function mapRdfToFlow(store: RdfStore): FlowMapperResult {
             label,
             data: { edgeType },
             animated: options?.animated,
-            style: options?.style,
+            style: mergedStyle,
+            sourceHandle: options?.sourceHandle,
+            targetHandle: options?.targetHandle,
         });
     };
 
-    // TODO: edges should be rendered much more dynamically as they can quickly clutter up the UI
+    // Track strong edges to skip weaker semantics (edge consolidation)
+    // subClassOf implies broader, domain implies domainIncludes, range implies rangeIncludes
+    const hierarchyEdgePairs = new Set<string>(); // "source->target" pairs with subClassOf
+    const domainEdgePairs = new Set<string>();    // "source->target" pairs with domain
+    const rangeEdgePairs = new Set<string>();     // "source->target" pairs with range
 
     // Create edges between ObjectTypes (hierarchy)
+    // Hierarchy edges use vertical handles: parent's bottom → child's top
+    // Process subClassOf FIRST (stronger semantics), then broader
     for (const info of objectTypes) {
-        for (const { pred, label, type } of OBJECT_TO_OBJECT_PREDICATES) {
-            info.pointer.out(pred).terms.forEach(t => 
-                // Swapped: parent (t.value) as source, child (info.iri) as target
-                // This makes edges flow downward in hierarchy (parent's bottom → child's top)
-                addEdge(t.value, info.iri, label, type)
-            );
-        }
+        // First pass: rdfs:subClassOf (stronger semantics)
+        info.pointer.out(ns.rdfs('subClassOf')).terms.forEach(t => {
+            const pairKey = `${t.value}->${info.iri}`;
+            hierarchyEdgePairs.add(pairKey);
+            addEdge(t.value, info.iri, 'subClassOf', 'subClassOf', {
+                sourceHandle: 'bottom',
+                targetHandle: 'top',
+            });
+        });
         
-        // Also check for sh:targetClass on NodeShapes pointing to classes
+        // Second pass: skos:broader (weaker semantics) - skip if subClassOf exists
+        info.pointer.out(ns.skos('broader')).terms.forEach(t => {
+            const pairKey = `${t.value}->${info.iri}`;
+            if (!hierarchyEdgePairs.has(pairKey)) {
+                addEdge(t.value, info.iri, 'broader', 'broader', {
+                    sourceHandle: 'bottom',
+                    targetHandle: 'top',
+                });
+            }
+        });
+        
+        // sh:targetClass on NodeShapes pointing to classes (vertical, dashed styling from getEdgeStyle)
         if (info.flags.isNodeShape) {
             info.pointer.out(ns.sh('targetClass')).terms.forEach(t =>
-                addEdge(t.value, info.iri, 'targetClass', 'targetClass', { style: 'stroke-dasharray: 5 5' })
+                addEdge(t.value, info.iri, 'targetClass', 'targetClass', { 
+                    sourceHandle: 'bottom',
+                    targetHandle: 'top',
+                })
             );
         }
     }
 
     // Create edges from ObjectProperties (domain/range)
+    // Domain/range edges use horizontal handles for semantic flow
     for (const info of objectProperties) {
-        // Domain: ObjectType <-- ObjectProperty (edge from domain to property)
+        // Domain: ObjectType's right → ObjectProperty's left (stronger semantics first)
         if (info.domainIris) {
             for (const domainIri of info.domainIris) {
                 if (nodeIds.has(domainIri)) {
-                    addEdge(domainIri, info.iri, 'domain', 'domain');
+                    const pairKey = `${domainIri}->${info.iri}`;
+                    domainEdgePairs.add(pairKey);
+                    addEdge(domainIri, info.iri, 'domain', 'domain', {
+                        sourceHandle: 'right',
+                        targetHandle: 'left',
+                        animated: true,
+                    });
                 }
             }
         }
         
-        // Range: ObjectProperty --> ObjectType
+        // Range: ObjectProperty's right → ObjectType's left (stronger semantics first)
         if (info.rangeIris) {
             for (const rangeIri of info.rangeIris) {
                 if (nodeIds.has(rangeIri)) {
-                    addEdge(info.iri, rangeIri, 'range', 'range');
+                    const pairKey = `${info.iri}->${rangeIri}`;
+                    rangeEdgePairs.add(pairKey);
+                    addEdge(info.iri, rangeIri, 'range', 'range', {
+                        sourceHandle: 'right',
+                        targetHandle: 'left',
+                        animated: true,
+                    });
                 }
             }
         }
 
-        // schema:domainIncludes (weak semantics)
+        // schema:domainIncludes (weaker semantics) - skip if domain exists for same pair
         if (info.domainIncludesIris) {
             for (const domainIri of info.domainIncludesIris) {
                 if (nodeIds.has(domainIri)) {
-                    addEdge(domainIri, info.iri, 'domainIncludes', 'domainIncludes', { style: 'stroke-dasharray: 3 3' });
+                    const pairKey = `${domainIri}->${info.iri}`;
+                    if (!domainEdgePairs.has(pairKey)) {
+                        addEdge(domainIri, info.iri, 'domainIncludes', 'domainIncludes', { 
+                            sourceHandle: 'right',
+                            targetHandle: 'left',
+                            animated: true,
+                        });
+                    }
                 }
             }
         }
 
-        // schema:rangeIncludes (weak semantics)
+        // schema:rangeIncludes (weaker semantics) - skip if range exists for same pair
         if (info.rangeIncludesIris) {
             for (const rangeIri of info.rangeIncludesIris) {
                 if (nodeIds.has(rangeIri)) {
-                    addEdge(info.iri, rangeIri, 'rangeIncludes', 'rangeIncludes', { style: 'stroke-dasharray: 3 3' });
+                    const pairKey = `${info.iri}->${rangeIri}`;
+                    if (!rangeEdgePairs.has(pairKey)) {
+                        addEdge(info.iri, rangeIri, 'rangeIncludes', 'rangeIncludes', { 
+                            sourceHandle: 'right',
+                            targetHandle: 'left',
+                            animated: true,
+                        });
+                    }
                 }
             }
         }
 
-        // Property-to-Property edges
-        for (const { pred, label, type } of PROPERTY_TO_PROPERTY_PREDICATES) {
-            info.pointer.out(pred).terms.forEach(t => 
-                addEdge(info.iri, t.value, label, type)
-            );
-        }
+        // Property hierarchy edges (subPropertyOf) - vertical handles
+        info.pointer.out(ns.rdfs('subPropertyOf')).terms.forEach(t => {
+            // Parent (t.value) as source, child (info.iri) as target
+            addEdge(t.value, info.iri, 'subPropertyOf', 'subPropertyOf', {
+                sourceHandle: 'bottom',
+                targetHandle: 'top',
+            });
+        });
     }
 
-    return { nodes, edges };
+    return { nodes, edges, rootNodeIds };
 }
 
 /****************************************************************************************

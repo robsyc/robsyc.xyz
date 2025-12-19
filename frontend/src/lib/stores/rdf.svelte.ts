@@ -4,44 +4,13 @@ import type { Quad, NamedNode, BlankNode, Term, Quad_Subject, Quad_Predicate, Qu
 import clownface from 'clownface';
 import type { GraphPointer, MultiPointer, AnyPointer } from 'clownface';
 
-import SHACLValidator from 'rdf-validate-shacl'
-import { findNodes, fromNode, type ShaclPropertyPath } from 'clownface-shacl-path';
-import namespace from '@rdfjs/namespace';
+// Re-export namespaces from centralized location
+export { ns } from '$lib/rdf/namespaces';
+import { ns, PREFIXES } from '$lib/rdf/namespaces';
 
 // N3.DataFactory will give you the factory functions to create triples and quads
 // http://rdf.js.org/#datafactory-interface
 const { namedNode, literal, quad } = DataFactory;
-
-/****************************************************************************************
- * Namespace Builders
- * 
- * @rdfjs/namespace for clean, type-safe namespace handling.
- * These create factory functions that produce NamedNodes for any local name.
- * 
- * @example
- * ns.sh('property')        // returns namedNode('http://www.w3.org/ns/shacl#property')
- */
-export const ns = {
-    xsd: namespace('http://www.w3.org/2001/XMLSchema#'),
-    rdf: namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#'),
-    rdfs: namespace('http://www.w3.org/2000/01/rdf-schema#'),
-    owl: namespace('http://www.w3.org/2002/07/owl#'),
-    sh: namespace('http://www.w3.org/ns/shacl#'),
-    shui: namespace('http://www.w3.org/ns/shacl-ui#'),
-    skos: namespace('http://www.w3.org/2004/02/skos/core#'),
-    schema: namespace('https://schema.org/'),
-    rxyz: namespace('http://robsyc.xyz/'),
-    
-    /**
-     * Create a NamedNode from a full IRI string.
-     * Useful when you have an IRI from RDF data and need to use it for traversal.
-     * 
-     * @example
-     * const propertyIri = shapePointer.out(ns.rxyz('containerProperty')).value;
-     * const predicate = ns.fromIri(propertyIri); // NamedNode for traversal
-     */
-    fromIri: (iri: string): NamedNode => namedNode(iri),
-};
 
 /****************************************************************************************
  * Reactive RDF Store wrapper around N3.Store using Svelte 5 runes.
@@ -50,9 +19,6 @@ export const ns = {
 export class RdfStore {
     // Reactive version counter - increment to trigger re-derivation
     version = $state(0);
-
-    // Track loaded sources
-    #loadedUrls = new Set<string>();
 
     // N3.Store for in-memory triple storage
     // If you are using multiple stores, you can reduce memory consumption by allowing them to share an entity index
@@ -92,16 +58,11 @@ export class RdfStore {
      * Load RDF data from either a URL or raw text.
      * Returns the number of new quads added.
      */
-    async load(options: { url?: string; text?: string; baseIRI?: string; force?: boolean }): Promise<number> {
-        const { url, text, baseIRI, force } = options;
+    async load(options: { url?: string; text?: string; baseIRI?: string }): Promise<number> {
+        const { url, text, baseIRI } = options;
 
         if (!url && !text) {
             throw new Error('Provide either url or text to load RDF data');
-        }
-
-        if (url && !force && this.#loadedUrls.has(url)) {
-            console.log(`[RdfStore] Already loaded: ${url}`);
-            return 0;
         }
 
         let triples: string;
@@ -122,7 +83,6 @@ export class RdfStore {
 
         if (added > 0) {
             this.version++;
-            if (url) this.#loadedUrls.add(url);
         }
 
         return added;
@@ -199,16 +159,14 @@ export class RdfStore {
      * Defaults to Turtle with PREFIXES.
      */
     serialize(options?: { 
-        format?: 'turtle' | 'turtle*' | 'n-triples' | 'trig' | 'trig*' | 'n-quads' ; 
+        format?: 'turtle' ; // | 'turtle*' | 'n-triples' | 'trig' | 'trig*' | 'n-quads' ; 
         quads?: Quad[]; 
     }): string {
-        const format = (options?.format ?? 'turtle').toLowerCase();
         const quadsToWrite = options?.quads ?? this.#store.getQuads(null, null, null, null);
-
-
-        // TODO: add prefixes from ns?
-        // TODO: add option to use turtle pretty print
-        const writer = new Writer( { format: format });
+        const writer = new Writer({ 
+            format: options?.format ?? 'turtle', 
+            prefixes: PREFIXES 
+        });
         writer.addQuads(quadsToWrite);
 
         let result = '';
@@ -224,7 +182,6 @@ export class RdfStore {
      */
     clear(): void {
         this.#store = new Store(); // renew the store
-        this.#loadedUrls.clear();  // clear the loaded URLs
         this.version++;  // increment the version to trigger a re-derivation
     }
 }

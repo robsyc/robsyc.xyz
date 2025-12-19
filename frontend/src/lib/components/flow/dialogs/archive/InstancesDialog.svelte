@@ -23,7 +23,7 @@
 </script>
 
 <Dialog.Root bind:open>
-    <Dialog.Content class="sm:max-w-lg">
+    <Dialog.Content class="sm:max-w-4xl max-h-[95vh]">
         <Dialog.Header>
             <Dialog.Title class="flex items-center gap-2">
                 <Database class="h-5 w-5" />
@@ -55,6 +55,9 @@
         </Dialog.Footer>
     </Dialog.Content>
 </Dialog.Root>
+
+
+
 
 
 

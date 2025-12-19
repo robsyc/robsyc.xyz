@@ -28,6 +28,8 @@ export interface ObjectTypeInfo {
     pointer: GraphPointer<NamedNode | BlankNode, Store>;
     iri: string;
     flags: ObjectTypeFlags;
+    /** True if this type has no parents (no rdfs:subClassOf or skos:broader) */
+    isRoot: boolean;
 }
 
 /** Semantic type flags for ObjectProperties (relationships connecting ObjectTypes) */
@@ -53,6 +55,8 @@ export interface ObjectPropertyInfo {
     rangeIncludesIris?: string[];
     /** Pointer to the inverse property (if any) */
     inversePointer?: GraphPointer<NamedNode | BlankNode, Store>;
+    /** True if this property has no parent properties (no rdfs:subPropertyOf) */
+    isRoot: boolean;
 }
 
 /****************************************************************************************
@@ -123,12 +127,35 @@ export function isObjectProperty(flags: ObjectPropertyFlags): boolean {
  * Finder Functions
  */
 
+/** 
+ * Check if a pointer has VALID parent relationships (subClassOf or broader)
+ * where the parent actually exists in the set of known ObjectTypes.
+ * This prevents orphan references (e.g., subClassOf owl:Thing when Thing isn't defined)
+ * from breaking progressive rendering.
+ */
+function hasValidParentRelationships(
+    pointer: GraphPointer<NamedNode | BlankNode, Store>,
+    knownObjectTypeIris: Set<string>
+): boolean {
+    const subClassOf = pointer.out(ns.rdfs('subClassOf')).terms;
+    const broader = pointer.out(ns.skos('broader')).terms;
+    
+    // Only count as having parents if at least one parent EXISTS in our detected types
+    const allParentRefs = [...subClassOf, ...broader];
+    return allParentRefs.some(t => knownObjectTypeIris.has(t.value));
+}
+
 /** Find all ObjectTypes in the store */
 export function findAllObjectTypes(store: RdfStore): ObjectTypeInfo[] {
-    const results: ObjectTypeInfo[] = [];
+    const candidates: Array<{
+        pointer: GraphPointer<NamedNode | BlankNode, Store>;
+        iri: string;
+        flags: ObjectTypeFlags;
+    }> = [];
     const seen = new Set<string>();
 
-    const processCandidate = (subject: NamedNode | BlankNode) => {
+    // First pass: collect all ObjectType candidates
+    const collectCandidate = (subject: NamedNode | BlankNode) => {
         const iri = subject.value;
         if (seen.has(iri)) return;
         seen.add(iri);
@@ -137,7 +164,7 @@ export function findAllObjectTypes(store: RdfStore): ObjectTypeInfo[] {
         const flags = detectObjectType(pointer);
 
         if (isObjectType(flags)) {
-            results.push({ pointer, iri, flags });
+            candidates.push({ pointer, iri, flags });
         }
     };
 
@@ -146,20 +173,51 @@ export function findAllObjectTypes(store: RdfStore): ObjectTypeInfo[] {
     for (const typeIri of [ns.rdfs('Class'), ns.owl('Class'), ns.sh('NodeShape')]) {
         for (const quad of store.getQuads(null, rdfType, typeIri as any)) {
             if (quad.subject.termType === 'NamedNode' || quad.subject.termType === 'BlankNode') {
-                processCandidate(quad.subject);
+                collectCandidate(quad.subject);
             }
         }
     }
 
+    // Build set of all known ObjectType IRIs for parent validation
+    const knownObjectTypeIris = new Set(candidates.map(c => c.iri));
+
+    // Second pass: determine isRoot by checking if parents exist in our set
+    const results: ObjectTypeInfo[] = candidates.map(({ pointer, iri, flags }) => {
+        const isRoot = !hasValidParentRelationships(pointer, knownObjectTypeIris);
+        return { pointer, iri, flags, isRoot };
+    });
+
     return results;
+}
+
+/** 
+ * Check if a property has VALID parent property relationships (subPropertyOf)
+ * where the parent actually exists in the set of known ObjectProperties.
+ */
+function hasValidParentPropertyRelationships(
+    pointer: GraphPointer<NamedNode | BlankNode, Store>,
+    knownPropertyIris: Set<string>
+): boolean {
+    const subPropertyOf = pointer.out(ns.rdfs('subPropertyOf')).terms;
+    return subPropertyOf.some(t => knownPropertyIris.has(t.value));
 }
 
 /** Find all ObjectProperties in the store */
 export function findAllObjectProperties(store: RdfStore): ObjectPropertyInfo[] {
-    const results: ObjectPropertyInfo[] = [];
+    const candidates: Array<{
+        pointer: GraphPointer<NamedNode | BlankNode, Store>;
+        iri: string;
+        flags: ObjectPropertyFlags;
+        domainIris?: string[];
+        rangeIris?: string[];
+        domainIncludesIris?: string[];
+        rangeIncludesIris?: string[];
+        inversePointer?: GraphPointer<NamedNode | BlankNode, Store>;
+    }> = [];
     const seen = new Set<string>();
 
-    const processCandidate = (subject: NamedNode | BlankNode) => {
+    // First pass: collect all ObjectProperty candidates
+    const collectCandidate = (subject: NamedNode | BlankNode) => {
         const iri = subject.value;
         if (seen.has(iri)) return;
         seen.add(iri);
@@ -182,7 +240,7 @@ export function findAllObjectProperties(store: RdfStore): ObjectPropertyInfo[] {
                 inversePointer = store.pointer(flags.inverseIri) as GraphPointer<NamedNode | BlankNode, Store>;
             }
 
-            results.push({ 
+            candidates.push({ 
                 pointer, 
                 iri, 
                 flags, 
@@ -199,9 +257,18 @@ export function findAllObjectProperties(store: RdfStore): ObjectPropertyInfo[] {
     
     for (const quad of store.getQuads(null, rdfType, ns.owl('ObjectProperty') as any)) {
         if (quad.subject.termType === 'NamedNode' || quad.subject.termType === 'BlankNode') {
-            processCandidate(quad.subject);
+            collectCandidate(quad.subject);
         }
     }
+
+    // Build set of all known ObjectProperty IRIs for parent validation
+    const knownPropertyIris = new Set(candidates.map(c => c.iri));
+
+    // Second pass: determine isRoot by checking if parents exist in our set
+    const results: ObjectPropertyInfo[] = candidates.map((candidate) => {
+        const isRoot = !hasValidParentPropertyRelationships(candidate.pointer, knownPropertyIris);
+        return { ...candidate, isRoot };
+    });
 
     return results;
 }

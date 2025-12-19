@@ -109,7 +109,7 @@
 </script>
 
 <Dialog.Root bind:open>
-    <Dialog.Content class="sm:max-w-3xl max-h-[85vh]">
+    <Dialog.Content class="sm:max-w-4xl max-h-[95vh]">
         <Dialog.Header>
             <Dialog.Title class="flex items-center gap-2">
                 RDF Serialization
@@ -131,4 +131,5 @@
         </div>
     </Dialog.Content>
 </Dialog.Root>
+
 

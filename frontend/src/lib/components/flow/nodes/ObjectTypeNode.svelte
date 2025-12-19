@@ -7,8 +7,9 @@
      * 
      * Features:
      * - Type badges (rdfs:Class, owl:Class, sh:NodeShape)
-     * - Hierarchy toggle buttons (show/hide parent/child edges)
-     * - Lock toggle (keep node on canvas)
+     * - Hierarchy toggle buttons (icon-only, visible on hover)
+     * - Lock toggle (keep node on canvas during collapse)
+     * - Click-to-copy IRI
      * - Action buttons for dialogs
      */
     import { Handle, Position, type NodeProps } from '@xyflow/svelte';
@@ -23,6 +24,8 @@
         ChevronDown,
         Lock,
         Unlock,
+        Copy,
+        Check,
     } from "@lucide/svelte";
     
     import type { ObjectTypeNodeData } from '$lib/rdf/flow-mapper';
@@ -30,6 +33,7 @@
     import { getLabel, getComment } from '$lib/rdf/flow-mapper';
     import { getCompactURI } from '$lib/rdf/utils';
     import { ns } from '$lib/stores/rdf.svelte';
+    import { visibilityStore } from '$lib/stores/visibility.svelte';
     
     import DetailsDialog from '../dialogs/DetailsDialog.svelte';
     import SerializeDialog from '../dialogs/SerializeDialog.svelte';
@@ -51,116 +55,135 @@
         comment && comment.length > 80 ? comment.substring(0, 77) + '...' : comment
     );
     
-    // Check if this node has hierarchy edges
-    const hasParents = $derived.by(() => {
+    // Check hierarchy relationships from RDF data
+    const hasParentsInRdf = $derived.by(() => {
         const subClassOf = pointer.out(ns.rdfs('subClassOf')).terms;
         const broader = pointer.out(ns.skos('broader')).terms;
         return subClassOf.length > 0 || broader.length > 0;
     });
     
-    const hasChildren = $derived.by(() => {
+    const hasChildrenInRdf = $derived.by(() => {
         const subClassOf = pointer.in(ns.rdfs('subClassOf')).terms;
         const narrower = pointer.in(ns.skos('broader')).terms;
         return subClassOf.length > 0 || narrower.length > 0;
     });
     
-    // Node state
-    // TODO: These toggles currently only update local state
-    // To actually hide/show edges, we need to communicate with the page via:
-    // - A shared Svelte store for edge visibility per node
-    // - Or using useSvelteFlow to access/filter edges
-    // We need to keep track of which triples are visible/hidden as edges and are added/removed dynamically
-    // important to think this through architecturally as it will be a major performance bottleneck if not done correctly
-    let isLocked = $state(false);
-    let showParents = $state(true);
-    let showChildren = $state(true);
+    // Visibility state from store
+    const isExpanded = $derived(visibilityStore.isExpanded(id));
+    const isLocked = $derived(visibilityStore.isLocked(id));
+    const hasVisibleChildren = $derived(visibilityStore.hasVisibleChildren(id));
+    
+    // UI state
+    let isHovered = $state(false);
+    let copiedIri = $state(false);
     
     // Dialog states
     let detailsOpen = $state(false);
     let serializeOpen = $state(false);
     let instancesOpen = $state(false);
+    
+    // Toggle children visibility via visibility store
+    function toggleChildren() {
+        visibilityStore.toggleNode(id);
+    }
+    
+    // Toggle lock status
+    function toggleLock() {
+        visibilityStore.toggleLock(id);
+    }
+    
+    // Copy IRI to clipboard
+    async function copyIri() {
+        await navigator.clipboard.writeText(iri);
+        copiedIri = true;
+        setTimeout(() => copiedIri = false, 1500);
+    }
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div 
-    class="relative"
+    class="relative group"
     class:ring-2={selected} 
     class:ring-primary={selected}
+    class:rounded-full={selected}
+    onmouseenter={() => isHovered = true}
+    onmouseleave={() => isHovered = false}
 >
-    <!-- Top controls: Parent toggle -->
-    {#if hasParents}
-        <div class="absolute -top-7 left-1/2 -translate-x-1/2 flex gap-1">
-            <Tooltip.Provider>
-                <Tooltip.Root>
-                    <Tooltip.Trigger>
-                        <Button 
-                            variant={showParents ? "secondary" : "outline"} 
-                            size="sm" 
-                            class="h-6 px-2 text-xs"
-                            onclick={() => showParents = !showParents}
-                        >
-                            <ChevronUp class="h-3 w-3 mr-1" />
-                            {showParents ? 'Hide' : 'Show'} parents
-                        </Button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content>
-                        <p>Toggle superclass/broader visibility</p>
-                    </Tooltip.Content>
-                </Tooltip.Root>
-            </Tooltip.Provider>
-        </div>
-    {/if}
-
-    <Handle type="target" position={Position.Top} />
-    <Handle type="target" position={Position.Left} />
+    <!-- Hierarchy handles (vertical) - for subClassOf/broader -->
+    <Handle type="target" position={Position.Top} id="top" />
+    
+    <!-- Relation handles (horizontal) - for domain/range connections -->
+    <Handle type="target" position={Position.Left} id="left" />
 
     <!-- Wide stadium shape (rounded left/right edges) -->
     <div class="
-        w-80 min-h-28 px-6 py-4
+        w-80 min-h-28 px-6 py-3
         bg-background border-2 border-border
         shadow-md hover:shadow-lg transition-shadow
         flex flex-col items-center justify-center text-center
         rounded-full
     ">
-        <!-- Header: Badges + Lock toggle -->
-        <div class="flex items-center justify-between w-full mb-2">
+        <!-- Header: Badges + Lock toggle (lock visible on hover or when locked) -->
+        <div class="flex items-center justify-between w-full mb-1">
             <div class="flex flex-wrap gap-1 justify-center flex-1">
                 {#each badges as badge (badge)}
-                    <Badge variant="secondary" class="text-xs font-mono">{badge}</Badge>
+                    <Badge variant="secondary" class="text-xs font-mono h-5">{badge}</Badge>
                 {/each}
             </div>
             
-            <Tooltip.Provider>
-                <Tooltip.Root>
-                    <Tooltip.Trigger>
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            class="h-6 w-6 p-0 ml-2"
-                            onclick={() => isLocked = !isLocked}
-                        >
-                            {#if isLocked}
-                                <Lock class="h-3.5 w-3.5" />
-                            {:else}
-                                <Unlock class="h-3.5 w-3.5 text-muted-foreground" />
-                            {/if}
-                        </Button>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content>
-                        <p>{isLocked ? 'Unlock node' : 'Lock node on canvas'}</p>
-                    </Tooltip.Content>
-                </Tooltip.Root>
-            </Tooltip.Provider>
+            <div class="transition-opacity" class:opacity-0={!isHovered && !isLocked} class:opacity-100={isHovered || isLocked}>
+                <Tooltip.Provider>
+                    <Tooltip.Root>
+                        <Tooltip.Trigger>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                class="h-6 w-6 p-0"
+                                onclick={toggleLock}
+                            >
+                                {#if isLocked}
+                                    <Lock class="h-3.5 w-3.5" />
+                                {:else}
+                                    <Unlock class="h-3.5 w-3.5 text-muted-foreground" />
+                                {/if}
+                            </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>
+                            <p>{isLocked ? 'Unlock node' : 'Lock node on canvas'}</p>
+                        </Tooltip.Content>
+                    </Tooltip.Root>
+                </Tooltip.Provider>
+            </div>
         </div>
         
         <!-- Label -->
-        <h3 class="font-semibold text-base mb-0.5">{label}</h3>
+        <h3 class="font-semibold text-base leading-tight">{label}</h3>
         
-        <!-- Compact IRI -->
-        <p class="font-mono text-xs text-muted-foreground mb-1">{compactIri}</p>
+        <!-- Compact IRI with copy button -->
+        <Tooltip.Provider>
+            <Tooltip.Root>
+                <Tooltip.Trigger>
+                    <button 
+                        class="font-mono text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                        onclick={copyIri}
+                    >
+                        {compactIri}
+                        {#if copiedIri}
+                            <Check class="h-3 w-3 text-green-500" />
+                        {:else}
+                            <Copy class="h-3 w-3 opacity-0 group-hover:opacity-50" />
+                        {/if}
+                    </button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                    <p>{copiedIri ? 'Copied!' : 'Click to copy full IRI'}</p>
+                </Tooltip.Content>
+            </Tooltip.Root>
+        </Tooltip.Provider>
         
-        <!-- Comment -->
-        {#if truncatedComment}
-            <p class="text-xs text-muted-foreground max-w-[240px] mb-2">{truncatedComment}</p>
+        <!-- Comment (only show if exists and not default) -->
+        {#if truncatedComment && truncatedComment !== 'No rdfs:comment defined'}
+            <p class="text-xs text-muted-foreground max-w-[240px] mt-1">{truncatedComment}</p>
         {/if}
         
         <!-- Action buttons -->
@@ -168,7 +191,7 @@
             <Tooltip.Provider>
                 <Tooltip.Root>
                     <Tooltip.Trigger>
-                        <Button variant="ghost" size="sm" class="h-7 px-2" onclick={() => detailsOpen = true}>
+                        <Button variant="ghost" size="sm" class="h-7 w-7 p-0" onclick={() => detailsOpen = true}>
                             <Info class="h-3.5 w-3.5" />
                         </Button>
                     </Tooltip.Trigger>
@@ -179,7 +202,7 @@
             <Tooltip.Provider>
                 <Tooltip.Root>
                     <Tooltip.Trigger>
-                        <Button variant="ghost" size="sm" class="h-7 px-2" onclick={() => serializeOpen = true}>
+                        <Button variant="ghost" size="sm" class="h-7 w-7 p-0" onclick={() => serializeOpen = true}>
                             <Code class="h-3.5 w-3.5" />
                         </Button>
                     </Tooltip.Trigger>
@@ -190,7 +213,7 @@
             <Tooltip.Provider>
                 <Tooltip.Root>
                     <Tooltip.Trigger>
-                        <Button variant="ghost" size="sm" class="h-7 px-2" onclick={() => instancesOpen = true}>
+                        <Button variant="ghost" size="sm" class="h-7 w-7 p-0" onclick={() => instancesOpen = true}>
                             <Database class="h-3.5 w-3.5" />
                         </Button>
                     </Tooltip.Trigger>
@@ -200,27 +223,33 @@
         </div>
     </div>
 
-    <Handle type="source" position={Position.Bottom} />
-    <Handle type="source" position={Position.Right} />
+    <!-- Hierarchy handles (vertical) - for subClassOf/broader to children -->
+    <Handle type="source" position={Position.Bottom} id="bottom" />
     
-    <!-- Bottom controls: Children toggle -->
-    {#if hasChildren}
-        <div class="absolute -bottom-7 left-1/2 -translate-x-1/2 flex gap-1">
+    <!-- Relation handles (horizontal) - for domain/range connections -->
+    <Handle type="source" position={Position.Right} id="right" />
+    
+    <!-- Bottom controls: Children toggle (icon-only, visible on hover when children exist) -->
+    {#if hasChildrenInRdf}
+        <div 
+            class="absolute -bottom-6 left-1/2 -translate-x-1/2 transition-opacity"
+            class:opacity-0={!isHovered && !isExpanded}
+            class:opacity-100={isHovered || isExpanded}
+        >
             <Tooltip.Provider>
                 <Tooltip.Root>
                     <Tooltip.Trigger>
                         <Button 
-                            variant={showChildren ? "secondary" : "outline"} 
+                            variant={isExpanded ? "secondary" : "outline"} 
                             size="sm" 
-                            class="h-6 px-2 text-xs"
-                            onclick={() => showChildren = !showChildren}
+                            class="h-6 w-6 p-0 rounded-full"
+                            onclick={toggleChildren}
                         >
-                            <ChevronDown class="h-3 w-3 mr-1" />
-                            {showChildren ? 'Hide' : 'Show'} children
+                            <ChevronDown class="h-4 w-4 transition-transform {isExpanded ? 'rotate-180' : ''}" />
                         </Button>
                     </Tooltip.Trigger>
                     <Tooltip.Content>
-                        <p>Toggle subclass/narrower visibility</p>
+                        <p>{isExpanded ? 'Hide subclasses' : 'Show subclasses'}</p>
                     </Tooltip.Content>
                 </Tooltip.Root>
             </Tooltip.Provider>

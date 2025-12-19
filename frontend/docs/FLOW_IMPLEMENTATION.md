@@ -1,4 +1,4 @@
-# RDF Flow Visualization - Implementation Guide
+# FLOW_IMPLEMENTATION.MD
 
 This document provides a comprehensive guide for implementing the RDF visualization system using Svelte, SvelteFlow, N3.js, and Clownface.
 
