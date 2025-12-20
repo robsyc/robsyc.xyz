@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 
 	import { ModeWatcher } from "mode-watcher";
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
 	let { children } = $props();
 
@@ -37,6 +38,9 @@
 	<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 </svelte:head>
 
-<main class="h-screen">
-	{@render children?.()}
-</main>
+<!-- Global tooltip provider for all IriTooltip components -->
+<Tooltip.Provider>
+	<main class="h-screen">
+		{@render children?.()}
+	</main>
+</Tooltip.Provider>

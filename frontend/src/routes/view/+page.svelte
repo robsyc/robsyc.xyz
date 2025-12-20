@@ -6,8 +6,8 @@
     import { Badge } from '$lib/components/ui/badge/index.js';
     import { Separator } from '$lib/components/ui/separator/index.js';
     import * as UnderlineTabs from '$lib/components/ui/underline-tabs/index.js';
+    import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
     import { rdfStore } from '$lib/stores/rdf.svelte';
-    import { ns } from '$lib/rdf/namespaces';
     import { 
         setRdfContext,
         HierarchyTree,
@@ -15,69 +15,74 @@
         AnnotationSection,
         HierarchySection,
         LiteralEditorDialog,
-        CreateResourceDialog
+        CreateResourceDialog,
+        HierarchyEditorDialog
     } from '$lib/components/rdf';
-    import { removeResourceRecursive, getResourceLabel, getChildren, type AnnotationValue } from '$lib/rdf/queries';
+    import { 
+        removeResourceRecursive, 
+        removeHierarchyRelation,
+        getResourceLabel, 
+        getChildren, 
+        type AnnotationValue 
+    } from '$lib/rdf/queries';
+    import {
+        type ResourceTypeId,
+        getViewableResourceTypes,
+        getPrimaryTypeIri,
+        getPrimaryHierarchyPredicate,
+        getHierarchyPredicatesForResource
+    } from '$lib/rdf/resource-types';
+    import { chooseTabForResource } from '$lib/rdf/view-profiles';
 
-    // Tab configuration for different resource types
-    type TabId = 'classes' | 'properties';
-    
-    interface TabConfig {
-        id: TabId;
-        label: string;
-        resourceType: NamedNode;
-        hierarchyPredicate: NamedNode;
-        typeBadge: string;
-        typeLabel: string;
-        emptyLabel: string;
-    }
-    
-    const TABS: TabConfig[] = [
-        {
-            id: 'properties',
-            label: 'Annotation Properties',
-            resourceType: ns.owl('AnnotationProperty'),
-            hierarchyPredicate: ns.rdfs('subPropertyOf'),
-            typeBadge: 'owl:AnnotationProperty',
-            typeLabel: 'Property',
-            emptyLabel: 'No annotation properties found'
-        },
-        {
-            id: 'classes',
-            label: 'Classes',
-            resourceType: ns.rdfs('Class'),
-            hierarchyPredicate: ns.rdfs('subClassOf'),
-            typeBadge: 'rdfs:Class',
-            typeLabel: 'Class',
-            emptyLabel: 'No classes found'
-        }
-        // TODO: sh:NodeShape, named sh:PropertyShape, owl:Class, owl:ObjectProperty, owl:DatatypeProperty
-    ];
+    // Get resource types to display as tabs (from centralized config)
+    const TABS = getViewableResourceTypes();
 
-    // Active tab state
-    let activeTab = $state<TabId>('classes');
+    // Active tab state (using resource type ID)
+    let activeTab = $state<ResourceTypeId>('class');
     const currentTabConfig = $derived(TABS.find(t => t.id === activeTab)!);
+    const currentHierarchyPredicate = $derived(getPrimaryHierarchyPredicate(currentTabConfig));
 
     // Selected resource state (per tab to preserve selection when switching)
-    let selectedByTab = $state<Record<TabId, NamedNode | BlankNode | null>>({
-        classes: null,
-        properties: null
-    });
+    let selectedByTab = $state<Record<string, NamedNode | BlankNode | null>>(
+        Object.fromEntries(TABS.map(t => [t.id, null]))
+    );
     const selectedResource = $derived(selectedByTab[activeTab]);
     
     // Loading state
     let isLoading = $state(true);
     let loadError = $state<string | null>(null);
 
-    // Annotation dialog state
-    let showAnnotationDialog = $state(false);
+    // Dialog state
+    let annotationDialogOpen = $state(false);
     let annotationSubject = $state<NamedNode | BlankNode | null>(null);
     let annotationPredicate = $state<NamedNode | undefined>(undefined);
-    let editingValue = $state<AnnotationValue | undefined>(undefined);
+    let annotationEditingValue = $state<AnnotationValue | undefined>(undefined);
 
-    // Create resource dialog state
-    let showCreateDialog = $state(false);
+    let createDialogOpen = $state(false);
     let createParent = $state<NamedNode | BlankNode | null>(null);
+
+    let hierarchyDialogOpen = $state(false);
+    let hierarchySubject = $state<NamedNode | BlankNode | null>(null);
+    let hierarchyPredicate = $state<NamedNode | null>(null);
+    let hierarchyExistingParent = $state<NamedNode | BlankNode | null>(null);
+
+    // Confirmation dialog state
+    let confirmDialogOpen = $state(false);
+    let confirmDialogTitle = $state('');
+    let confirmDialogDescription = $state('');
+    let confirmDialogAction = $state<(() => void) | null>(null);
+
+    function showConfirmDialog(title: string, description: string, onConfirm: () => void) {
+        confirmDialogTitle = title;
+        confirmDialogDescription = description;
+        confirmDialogAction = onConfirm;
+        confirmDialogOpen = true;
+    }
+
+    function handleConfirmDialogAction() {
+        confirmDialogAction?.();
+        confirmDialogOpen = false;
+    }
 
     // Set up context
     setRdfContext({
@@ -86,18 +91,21 @@
         setSelected: (resource) => { selectedByTab[activeTab] = resource; }
     });
 
-    // Load data on mount
-    onMount(async () => {
+    // Store size for display
+    const storeSize = $derived(rdfStore.size);
+
+    /**************************************************************************
+     * Data Loading
+     **************************************************************************/
+    
+    async function loadData() {
+        isLoading = true;
+        loadError = null;
         try {
-            isLoading = true;
-            loadError = null;
-            
-            // Load both TTL files
             await Promise.all([
                 rdfStore.load({ url: '/graphs/tests/01-basic-classes.ttl' }),
                 rdfStore.load({ url: '/graphs/config/owlAnnotationProperty.ttl' })
             ]);
-            
             console.log(`Loaded ${rdfStore.size} quads`);
         } catch (error) {
             console.error('Failed to load RDF data:', error);
@@ -105,13 +113,18 @@
         } finally {
             isLoading = false;
         }
-    });
+    }
 
-    // Export to Turtle
+    onMount(loadData);
+
+    async function handleReload() {
+        rdfStore.clear();
+        selectedByTab = Object.fromEntries(TABS.map(t => [t.id, null]));
+        await loadData();
+    }
+
     function handleExport() {
         const turtle = rdfStore.serialize({ format: 'turtle' });
-        
-        // Create a blob and download
         const blob = new Blob([turtle], { type: 'text/turtle' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -123,87 +136,133 @@
         URL.revokeObjectURL(url);
     }
 
-    // Reload data
-    async function handleReload() {
-        rdfStore.clear();
-        isLoading = true;
-        loadError = null;
-        
-        try {
-            await Promise.all([
-                rdfStore.load({ url: '/graphs/tests/01-basic-classes.ttl' }),
-                rdfStore.load({ url: '/graphs/config/owlAnnotationProperty.ttl' })
-            ]);
-            selectedByTab = { classes: null, properties: null };
-        } catch (error) {
-            loadError = error instanceof Error ? error.message : 'Failed to reload data';
-        } finally {
-            isLoading = false;
-        }
-    }
-
-    // Open add annotation dialog
-    function openAddAnnotationDialog(subject: NamedNode | BlankNode) {
-        annotationSubject = subject;
-        annotationPredicate = undefined;
-        editingValue = undefined;
-        showAnnotationDialog = true;
-    }
-
-    // Open add annotation dialog with pre-selected predicate
-    function openAddValueDialog(subject: NamedNode | BlankNode, predicate: NamedNode) {
-        annotationSubject = subject;
-        annotationPredicate = predicate;
-        editingValue = undefined;
-        showAnnotationDialog = true;
-    }
-
-    // Open edit annotation dialog
-    function openEditDialog(value: AnnotationValue) {
-        annotationSubject = value.quad.subject as NamedNode | BlankNode;
-        annotationPredicate = value.quad.predicate as NamedNode;
-        editingValue = value;
-        showAnnotationDialog = true;
-    }
-
-    // Store size for display
-    const storeSize = $derived(rdfStore.size);
-
-    // Resource CRUD handlers (generic for any tab)
-    function handleAddResource() {
-        createParent = null;
-        showCreateDialog = true;
-    }
-
-    function handleAddChildResource(parent: NamedNode | BlankNode) {
-        createParent = parent;
-        showCreateDialog = true;
-    }
-
-    function handleResourceCreated(resource: NamedNode) {
-        selectedByTab[activeTab] = resource;
-    }
-
-    function handleRemoveResource(resource: NamedNode | BlankNode) {
-        const config = currentTabConfig;
-        const label = getResourceLabel(rdfStore, resource);
-        const children = getChildren(rdfStore, resource, config.hierarchyPredicate);
-        
-        let message = `Delete ${config.typeLabel.toLowerCase()} "${label}"?`;
-        if (children.length > 0) {
-            message += `\n\nThis will also delete ${children.length} child${children.length > 1 ? 'ren' : ''} and all their properties.`;
-        }
-        
-        if (!confirm(message)) return;
-        
-        removeResourceRecursive(rdfStore, resource, config.hierarchyPredicate);
-        selectedByTab[activeTab] = null;
-    }
+    /**************************************************************************
+     * Annotation Handlers
+     **************************************************************************/
     
-    // Handle selection change from tree
-    function handleSelectionChange(resource: NamedNode | BlankNode | null) {
-        selectedByTab[activeTab] = resource;
-    }
+    const annotationHandlers = {
+        add: (subject: NamedNode | BlankNode) => {
+            annotationSubject = subject;
+            annotationPredicate = undefined;
+            annotationEditingValue = undefined;
+            annotationDialogOpen = true;
+        },
+        addValue: (subject: NamedNode | BlankNode, predicate: NamedNode) => {
+            annotationSubject = subject;
+            annotationPredicate = predicate;
+            annotationEditingValue = undefined;
+            annotationDialogOpen = true;
+        },
+        edit: (value: AnnotationValue) => {
+            annotationSubject = value.quad.subject as NamedNode | BlankNode;
+            annotationPredicate = value.quad.predicate as NamedNode;
+            annotationEditingValue = value;
+            annotationDialogOpen = true;
+        },
+        close: () => {
+            annotationDialogOpen = false;
+        },
+    };
+
+    /**************************************************************************
+     * Resource CRUD Handlers
+     **************************************************************************/
+    
+    const resourceHandlers = {
+        add: (parent: NamedNode | BlankNode | null) => {
+            createParent = parent;
+            createDialogOpen = true;
+        },
+        addChild: (parent: NamedNode | BlankNode) => {
+            createParent = parent;
+            createDialogOpen = true;
+        },
+        created: (resource: NamedNode) => {
+            selectedByTab[activeTab] = resource;
+        },
+        remove: (resource: NamedNode | BlankNode) => {
+            const config = currentTabConfig;
+            const predicate = getPrimaryHierarchyPredicate(config);
+            const label = getResourceLabel(rdfStore, resource);
+            const children = predicate ? getChildren(rdfStore, resource, predicate) : [];
+            
+            let description = `This will permanently delete the ${config.label.toLowerCase()} "${label}".`;
+            if (children.length > 0) {
+                description += ` This will also delete ${children.length} child${children.length > 1 ? 'ren' : ''} and all their properties.`;
+            }
+            
+            showConfirmDialog(
+                `Delete ${config.label}?`,
+                description,
+                () => {
+                    removeResourceRecursive(rdfStore, resource, predicate);
+                    selectedByTab[activeTab] = null;
+                }
+            );
+        },
+    };
+
+    /**************************************************************************
+     * Hierarchy Handlers
+     **************************************************************************/
+    
+    const hierarchyHandlers = {
+        add: (subject: NamedNode | BlankNode, predicate: NamedNode) => {
+            hierarchySubject = subject;
+            hierarchyPredicate = predicate;
+            hierarchyExistingParent = null;
+            hierarchyDialogOpen = true;
+        },
+        edit: (subject: NamedNode | BlankNode, predicate: NamedNode, existingParent: NamedNode | BlankNode) => {
+            hierarchySubject = subject;
+            hierarchyPredicate = predicate;
+            hierarchyExistingParent = existingParent;
+            hierarchyDialogOpen = true;
+        },
+        remove: (subject: NamedNode | BlankNode, predicate: NamedNode, object: NamedNode | BlankNode) => {
+            const subjectLabel = getResourceLabel(rdfStore, subject);
+            const objectLabel = getResourceLabel(rdfStore, object);
+            
+            showConfirmDialog(
+                'Remove Relationship?',
+                `Remove "${subjectLabel}" as a subtype of "${objectLabel}"?`,
+                () => {
+                    removeHierarchyRelation(rdfStore, subject, predicate, object);
+                }
+            );
+        },
+        close: () => {
+            hierarchyDialogOpen = false;
+        },
+    };
+
+    /**************************************************************************
+     * Navigation Handlers
+     **************************************************************************/
+    
+    const navigationHandlers = {
+        select: (resource: NamedNode | BlankNode | null) => {
+            selectedByTab[activeTab] = resource;
+        },
+        toPredicate: (predicate: NamedNode) => {
+            // Navigate to annotation property tab and select the predicate
+            activeTab = 'annotationProperty';
+            selectedByTab.annotationProperty = predicate;
+        },
+        toResource: (resource: NamedNode) => {
+            const availableTabs = new Set(Object.keys(selectedByTab));
+            const tab = chooseTabForResource(rdfStore, resource, availableTabs);
+
+            if (tab && selectedByTab[tab] !== undefined) {
+                activeTab = tab;
+                selectedByTab[tab] = resource;
+                return;
+            }
+
+            // Fallback: stay on current tab
+            selectedByTab[activeTab] = resource;
+        },
+    };
 </script>
 
 <svelte:head>
@@ -257,7 +316,7 @@
                 <UnderlineTabs.Root bind:value={activeTab}>
                     <UnderlineTabs.List>
                         {#each TABS as tab (tab.id)}
-                            <UnderlineTabs.Trigger value={tab.id}>{tab.label}</UnderlineTabs.Trigger>
+                            <UnderlineTabs.Trigger value={tab.id}>{tab.pluralLabel}</UnderlineTabs.Trigger>
                         {/each}
                     </UnderlineTabs.List>
                 </UnderlineTabs.Root>
@@ -268,40 +327,40 @@
                 <div class="grid grid-cols-2 gap-4 h-full">
                     <!-- Left: Resource hierarchy browser -->
                     <HierarchyTree
-                        resourceType={currentTabConfig.resourceType}
-                        hierarchyPredicate={currentTabConfig.hierarchyPredicate}
+                        resourceType={getPrimaryTypeIri(currentTabConfig)}
+                        hierarchyPredicate={currentHierarchyPredicate}
                         selected={selectedResource}
-                        onselect={handleSelectionChange}
-                        typeBadge={currentTabConfig.typeBadge}
+                        onselect={navigationHandlers.select}
+                        typeBadge={currentTabConfig.badge}
                         emptyLabel={currentTabConfig.emptyLabel}
-                        onadd={handleAddResource}
-                        onaddchild={handleAddChildResource}
-                        onremove={handleRemoveResource}
+                        onadd={resourceHandlers.add}
+                        onaddchild={resourceHandlers.addChild}
+                        onremove={resourceHandlers.remove}
                     />
                     
                     <!-- Right: Detail panel with sections -->
                     <ResourceDetailPanel subject={selectedResource}>
                         {#if selectedResource}
+                            {@const hierarchyPredicates = getHierarchyPredicatesForResource(rdfStore, selectedResource)}
                             <AnnotationSection 
                                 subject={selectedResource}
-                                onadd={openAddAnnotationDialog}
-                                onaddvalue={openAddValueDialog}
-                                onedit={openEditDialog}
+                                onadd={annotationHandlers.add}
+                                onaddvalue={annotationHandlers.addValue}
+                                onedit={annotationHandlers.edit}
+                                onpredicateclick={navigationHandlers.toPredicate}
+                                onvalueclick={navigationHandlers.toResource}
                             />
-                            <HierarchySection
-                                subject={selectedResource}
-                                predicate={currentTabConfig.hierarchyPredicate}
-                                label={activeTab === 'classes' ? 'Superclasses' : 'Parent Properties'}
-                                direction="outgoing"
-                                onnavigate={handleSelectionChange}
-                            />
-                            <HierarchySection
-                                subject={selectedResource}
-                                predicate={currentTabConfig.hierarchyPredicate}
-                                label={activeTab === 'classes' ? 'Subclasses' : 'Child Properties'}
-                                direction="incoming"
-                                onnavigate={handleSelectionChange}
-                            />
+                            {#if hierarchyPredicates.length > 0 || currentHierarchyPredicate}
+                                <HierarchySection
+                                    subject={selectedResource}
+                                    predicates={hierarchyPredicates.length > 0 ? hierarchyPredicates : currentHierarchyPredicate ? [currentHierarchyPredicate] : []}
+                                    onnavigate={navigationHandlers.select}
+                                    onpredicateclick={navigationHandlers.toPredicate}
+                                    onadd={hierarchyHandlers.add}
+                                    onedit={hierarchyHandlers.edit}
+                                    onremove={hierarchyHandlers.remove}
+                                />
+                            {/if}
                         {/if}
                     </ResourceDetailPanel>
                 </div>
@@ -310,26 +369,54 @@
     </main>
 </div>
 
+<!-- Create Resource Dialog (generic for current tab) -->
+<CreateResourceDialog
+    bind:open={createDialogOpen}
+    resourceType={getPrimaryTypeIri(currentTabConfig)}
+    parent={createParent}
+    hierarchyPredicate={currentHierarchyPredicate ?? undefined}
+    typeLabel={currentTabConfig.label}
+    oncreate={resourceHandlers.created}
+/>
+
 <!-- Add/Edit Annotation Dialog -->
-{#if annotationSubject}
+{#if annotationSubject && annotationDialogOpen}
     <LiteralEditorDialog
-        bind:open={showAnnotationDialog}
+        bind:open={annotationDialogOpen}
         subject={annotationSubject}
         predicate={annotationPredicate}
-        existingValue={editingValue}
-        onsubmit={() => { showAnnotationDialog = false; }}
-        onclose={() => { showAnnotationDialog = false; }}
+        existingValue={annotationEditingValue}
+        onsubmit={annotationHandlers.close}
+        onclose={annotationHandlers.close}
     />
 {/if}
 
-<!-- Create Resource Dialog (generic for current tab) -->
-<CreateResourceDialog
-    bind:open={showCreateDialog}
-    resourceType={currentTabConfig.resourceType}
-    parent={createParent}
-    hierarchyPredicate={currentTabConfig.hierarchyPredicate}
-    typeLabel={currentTabConfig.typeLabel}
-    oncreate={handleResourceCreated}
-/>
+<!-- Hierarchy Editor Dialog (for adding/editing subClassOf/subPropertyOf) -->
+{#if hierarchySubject && hierarchyPredicate}
+    <HierarchyEditorDialog
+        bind:open={hierarchyDialogOpen}
+        subject={hierarchySubject}
+        predicate={hierarchyPredicate}
+        existingParent={hierarchyExistingParent}
+        resourceType={getPrimaryTypeIri(currentTabConfig)}
+        dialogTitle={hierarchyExistingParent 
+            ? (activeTab === 'class' ? 'Edit Superclass' : 'Edit Parent Property')
+            : (activeTab === 'class' ? 'Add Superclass' : 'Add Parent Property')}
+        onsubmit={hierarchyHandlers.close}
+        onclose={hierarchyHandlers.close}
+    />
+{/if}
 
-
+<!-- Confirmation Dialog -->
+<AlertDialog.Root bind:open={confirmDialogOpen}>
+    <AlertDialog.Content>
+        <AlertDialog.Header>
+            <AlertDialog.Title>{confirmDialogTitle}</AlertDialog.Title>
+            <AlertDialog.Description>{confirmDialogDescription}</AlertDialog.Description>
+        </AlertDialog.Header>
+        <AlertDialog.Footer>
+            <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+            <AlertDialog.Action onclick={handleConfirmDialogAction}>Continue</AlertDialog.Action>
+        </AlertDialog.Footer>
+    </AlertDialog.Content>
+</AlertDialog.Root>

@@ -1,21 +1,25 @@
 <script lang="ts">
     import type { NamedNode, BlankNode } from 'n3';
+    import { DataFactory } from 'n3';
     import { Eye } from '@lucide/svelte';
     import { Button } from '$lib/components/ui/button/index.js';
     import { Label } from '$lib/components/ui/label/index.js';
     import { Switch } from '$lib/components/ui/switch/index.js';
+    import { Input } from '$lib/components/ui/input/index.js';
     import * as Dialog from '$lib/components/ui/dialog/index.js';
     import { getRdfContext } from '../context';
     import { HierarchyTree } from '../tree';
+    import { ResourceSelector } from '../shared';
     import DatatypeSelector from './DatatypeSelector.svelte';
     import LangStringEditor from './LangStringEditor.svelte';
     import { addAnnotation, updateAnnotation, type AnnotationValue } from '$lib/rdf/queries';
     import { ns, toCompactIri } from '$lib/rdf/namespaces';
     import { 
-        DATATYPES, getDatatypeByIri,
+        DATATYPES, getDatatypeByIri, getSuggestedDatatype,
         type DatatypeKey, validateLexicalForm, validateConstrainedInteger 
     } from '$lib/rdf/datatypes';
-    import { getSuggestedDatatype } from '$lib/rdf/datatype-hints';
+
+    const { namedNode } = DataFactory;
 
     interface Props {
         open?: boolean;
@@ -41,6 +45,8 @@
     // Infer datatype from existing value
     function inferDatatype(val?: AnnotationValue): DatatypeKey {
         if (!val) return 'string';
+        // Check if it's a NamedNode (resource reference)
+        if (val.quad.object.termType === 'NamedNode') return 'resourceReference';
         if (val.language) return 'langString';
         if (val.datatype) {
             const dt = getDatatypeByIri(val.datatype);
@@ -49,31 +55,54 @@
         return 'string';
     }
 
-    // Form state - initialized once, reset via effect when dialog opens
+    // UI state
+    let showPreview = $state(false);
+
+    // Form state (this component is mounted only while open in the parent)
     let selectedPredicate = $state<NamedNode | BlankNode | null>(null);
     let selectedDatatype = $state<DatatypeKey>('string');
     let value = $state('');
     let languageTag = $state('en');
-    
-    // Sync form state when dialog opens with new props
-    $effect(() => {
-        if (open) {
-            selectedPredicate = initialPredicate ?? (existingValue?.quad.predicate as NamedNode) ?? null;
-            selectedDatatype = inferDatatype(existingValue);
-            value = existingValue?.value ?? '';
-            languageTag = existingValue?.language ?? 'en';
-            showPreview = false;
-        }
-    });
-    
-    // UI state
-    let showPreview = $state(false);
+    let selectedResource = $state<NamedNode | BlankNode | null>(null);
+    let externalUri = $state('');
+    let useExternalUri = $state(false);
+
+    // Initialize from props at component creation time.
+    // Put this inside a closure to avoid state_referenced_locally warnings.
+    const initialize = () => {
+        selectedPredicate = initialPredicate ?? (existingValue?.quad.predicate as NamedNode) ?? null;
+        selectedDatatype = inferDatatype(existingValue);
+        value = existingValue?.value ?? '';
+        languageTag = existingValue?.language ?? 'en';
+        selectedResource = existingValue?.quad.object.termType === 'NamedNode'
+            ? (existingValue.quad.object as NamedNode)
+            : null;
+    };
+    initialize();
+
+    // Is this a resource reference type?
+    const isResourceReference = $derived(selectedDatatype === 'resourceReference');
 
     // Validation
     const validationError = $derived.by(() => {
-        const v = value;
         const dt = selectedDatatype;
         
+        // Resource reference validation
+        if (isResourceReference) {
+            if (useExternalUri) {
+                if (!externalUri.trim()) return null;
+                // Basic URI validation
+                try {
+                    new URL(externalUri);
+                    return null;
+                } catch {
+                    return 'Enter a valid URI (e.g., http://example.org/resource)';
+                }
+            }
+            return null; // Resource selector handles its own validation
+        }
+        
+        const v = value;
         if (!v.trim()) return null;
         if (dt === 'langString') return null;
         
@@ -93,6 +122,17 @@
     // Status message
     const statusMessage = $derived.by(() => {
         if (!selectedPredicate) return 'Select a property';
+        
+        if (isResourceReference) {
+            if (useExternalUri) {
+                if (!externalUri.trim()) return 'Enter a URI';
+                if (validationError) return validationError;
+            } else {
+                if (!selectedResource) return 'Select a resource';
+            }
+            return null;
+        }
+        
         if (!value.trim()) return 'Enter a value';
         if (validationError) return validationError;
         return null;
@@ -105,6 +145,12 @@
         if (!selectedPredicate) return '';
         const s = toCompactIri(subject.value);
         const p = toCompactIri(selectedPredicate.value);
+        
+        if (isResourceReference) {
+            const targetUri = useExternalUri ? externalUri : selectedResource?.value;
+            if (!targetUri) return '';
+            return `${s} ${p} <${targetUri}> .`;
+        }
         
         if (selectedDatatype === 'langString') {
             return `${s} ${p} "${value}"@${languageTag} .`;
@@ -119,32 +165,51 @@
     function handleSubmit() {
         if (!isValid || !selectedPredicate) return;
         
-        const options = selectedDatatype === 'langString'
-            ? { language: languageTag }
-            : { datatype: DATATYPES[selectedDatatype].node };
-        
-        if (existingValue) {
-            // Edit mode: remove old quad and add new one
-            updateAnnotation(store, existingValue.quad, value, options);
+        const predicateChanged = !!existingValue && selectedPredicate.value !== existingValue.quad.predicate.value;
+
+        if (isResourceReference) {
+            // Create NamedNode reference
+            const targetUri = useExternalUri ? externalUri : selectedResource?.value;
+            if (!targetUri) return;
+            
+            const targetNode = namedNode(targetUri);
+            
+            store.transaction(() => {
+                if (existingValue) {
+                    // Edit mode: remove old quad and add new one (predicate may have changed)
+                    store.removeQuad(existingValue.quad);
+                }
+                store.addQuad(subject, selectedPredicate as NamedNode, targetNode);
+            });
         } else {
-            // Add mode
-            addAnnotation(store, subject, selectedPredicate as NamedNode, value, options);
+            const options = selectedDatatype === 'langString'
+                ? { language: languageTag }
+                : { datatype: DATATYPES[selectedDatatype].node };
+            
+            if (existingValue) {
+                if (predicateChanged) {
+                    // Predicate changed: replace entire quad (old predicate group -> new predicate group)
+                    store.transaction(() => {
+                        store.removeQuad(existingValue.quad);
+                        addAnnotation(store, subject, selectedPredicate as NamedNode, value, options);
+                    });
+                } else {
+                    // Same predicate: update value/datatype/lang in-place (remove+add)
+                    updateAnnotation(store, existingValue.quad, value, options);
+                }
+            } else {
+                // Add mode
+                addAnnotation(store, subject, selectedPredicate as NamedNode, value, options);
+            }
         }
         
         onsubmit?.();
-        resetForm();
         open = false;
     }
 
     function handleClose() {
-        resetForm();
         onclose?.();
         open = false;
-    }
-
-    function resetForm() {
-        // State is reset via $effect when dialog reopens
-        // This is kept for manual reset if needed
     }
 
     function handlePropertySelect(prop: NamedNode | BlankNode | null) {
@@ -203,7 +268,47 @@
                 <div class="flex-1 p-3 flex flex-col gap-3 overflow-auto">
                     <p class="text-xs text-muted-foreground">{DATATYPES[selectedDatatype].description}</p>
                     
-                    {#if selectedDatatype === 'langString'}
+                    {#if isResourceReference}
+                        <!-- Resource Reference Editor -->
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-center gap-2">
+                                <Button
+                                    variant={useExternalUri ? "outline" : "default"}
+                                    size="sm"
+                                    onclick={() => useExternalUri = false}
+                                >
+                                    Internal
+                                </Button>
+                                <Button
+                                    variant={useExternalUri ? "default" : "outline"}
+                                    size="sm"
+                                    onclick={() => useExternalUri = true}
+                                >
+                                    External
+                                </Button>
+                            </div>
+                            
+                            {#if useExternalUri}
+                                <div class="flex flex-col gap-2">
+                                    <Label class="text-xs">External URI</Label>
+                                    <Input
+                                        type="url"
+                                        bind:value={externalUri}
+                                        placeholder="https://example.org/resource"
+                                        class="font-mono text-sm"
+                                    />
+                                </div>
+                            {:else}
+                                <div class="flex flex-col gap-2">
+                                    <Label class="text-xs">Select Resource</Label>
+                                    <ResourceSelector
+                                        bind:selected={selectedResource}
+                                        placeholder="Search for a resource..."
+                                    />
+                                </div>
+                            {/if}
+                        </div>
+                    {:else if selectedDatatype === 'langString'}
                         <LangStringEditor bind:value bind:languageTag />
                     {:else if DATATYPES[selectedDatatype].editorType === 'switch'}
                         <div class="flex items-center gap-3">
@@ -249,7 +354,7 @@
                         </div>
                     {/if}
                     
-                    {#if showPreview && selectedPredicate && value}
+                    {#if showPreview && selectedPredicate && (value || selectedResource || externalUri)}
                         <div class="mt-auto pt-2 border-t">
                             <p class="text-xs text-muted-foreground mb-1">Preview:</p>
                             <code class="text-xs font-mono break-all bg-muted p-2 rounded block">{preview}</code>

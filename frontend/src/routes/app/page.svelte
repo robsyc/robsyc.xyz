@@ -31,8 +31,8 @@
     // RDF store and flow mapper
     import { rdfStore } from '$lib/stores/rdf.svelte';
     import { visibilityStore } from '$lib/stores/visibility.svelte';
-    import { mapRdfToFlow } from '$lib/rdf/flow-mapper';
-    import { layoutWithELK, positionChildNode, defaultLayoutOptions } from '$lib/rdf/layout';
+    import { mapRdfToFlow } from '$lib/rdf/archive/flow-mapper';
+    import { layoutWithELK, positionChildNode, defaultLayoutOptions } from '$lib/rdf/archive/layout';
     
     // Node components
     import ObjectTypeNode from '$lib/components/flow/nodes/ObjectTypeNode.svelte';

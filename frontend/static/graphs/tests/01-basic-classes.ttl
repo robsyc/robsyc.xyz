@@ -14,11 +14,7 @@
 #           ├── rxyz:TechnologyTopic (subClassOf Topic)
 #           │     └── rxyz:WebTopic (subClassOf TechnologyTopic)
 #           └── rxyz:ContentTopic (subClassOf Topic)
-# 
-# EXPECTED UI:
-# - ObjectType nodes with rdfs:Class badge only
-# - Progressive rendering: Thing visible initially, expand via toggles
-# - Hierarchy edges via rdfs:subClassOf and skos:broader (subclass implies broader)
+#
 ################################################################################
 
 # Level 0: Root class (no parents)

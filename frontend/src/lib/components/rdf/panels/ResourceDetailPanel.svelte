@@ -1,11 +1,10 @@
 <script lang="ts">
     import type { NamedNode, BlankNode } from 'n3';
     import type { Snippet } from 'svelte';
-    import { Badge } from '$lib/components/ui/badge/index.js';
     import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
     import { getRdfContext } from '../context';
     import { getResourceLabel } from '$lib/rdf/queries';
-    import { toCompactIri, getLocalName } from '$lib/rdf/namespaces';
+    import { toCompactIri } from '$lib/rdf/namespaces';
 
     interface Props {
         /** The resource to display */

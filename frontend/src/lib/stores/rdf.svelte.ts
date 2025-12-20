@@ -20,11 +20,62 @@ export class RdfStore {
     // Reactive version counter - increment to trigger re-derivation
     version = $state(0);
 
+    // Batch mutation support: group multiple store writes into one reactive invalidation
+    #batchDepth = 0;
+    #dirty = false;
+
     // N3.Store for in-memory triple storage
     // If you are using multiple stores, you can reduce memory consumption by allowing them to share an entity index
     #store = new Store();
     get store(): Store {
         return this.#store;
+    }
+
+    #touch(): void {
+        if (this.#batchDepth > 0) {
+            this.#dirty = true;
+        } else {
+            this.version++;
+        }
+    }
+
+    /**
+     * Batch multiple mutations into a single reactive invalidation.
+     * Safe for nesting.
+     */
+    transaction<T>(fn: () => T): T {
+        this.#batchDepth++;
+        try {
+            return fn();
+        } finally {
+            this.#batchDepth--;
+            if (this.#batchDepth === 0 && this.#dirty) {
+                this.#dirty = false;
+                this.version++;
+            }
+        }
+    }
+
+    /**
+     * Async variant of transaction().
+     * Note: batching only covers mutations performed within the awaited callback.
+     */
+    async transactionAsync<T>(fn: () => Promise<T>): Promise<T> {
+        this.#batchDepth++;
+        try {
+            return await fn();
+        } finally {
+            this.#batchDepth--;
+            if (this.#batchDepth === 0 && this.#dirty) {
+                this.#dirty = false;
+                this.version++;
+            }
+        }
+    }
+
+    /** Alias for transaction() */
+    batch<T>(fn: () => T): T {
+        return this.transaction(fn);
     }
     
     /**
@@ -82,7 +133,7 @@ export class RdfStore {
         const added = this.#store.size - sizeBefore;
 
         if (added > 0) {
-            this.version++;
+            this.#touch();
         }
 
         return added;
@@ -94,7 +145,7 @@ export class RdfStore {
      */
     addQuad(subject: Quad_Subject, predicate: Quad_Predicate, object: Quad_Object, graph?: Quad_Graph): void {
         this.#store.addQuad(subject, predicate, object, graph);
-        this.version++;
+        this.#touch();
     }
 
     /**
@@ -102,7 +153,9 @@ export class RdfStore {
      */
     addQuads(quads: Quad[]): void {
         this.#store.addQuads(quads);
-        this.version++;
+        if (quads.length > 0) {
+            this.#touch();
+        }
     }
 
     /**
@@ -110,7 +163,19 @@ export class RdfStore {
      */
     removeQuad(quad: Quad): void {
         this.#store.removeQuad(quad);
-        this.version++;
+        this.#touch();
+    }
+
+    /**
+     * Remove multiple quads from the store (single version increment for batch operations)
+     */
+    removeQuads(quads: Quad[]): void {
+        for (const q of quads) {
+            this.#store.removeQuad(q);
+        }
+        if (quads.length > 0) {
+            this.#touch();
+        }
     }
 
     /**
@@ -182,7 +247,7 @@ export class RdfStore {
      */
     clear(): void {
         this.#store = new Store(); // renew the store
-        this.version++;  // increment the version to trigger a re-derivation
+        this.#touch();  // trigger a re-derivation
     }
 }
 

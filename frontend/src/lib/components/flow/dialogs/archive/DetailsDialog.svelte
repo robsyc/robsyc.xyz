@@ -18,8 +18,8 @@
     import type { NamedNode, BlankNode } from '@rdfjs/types';
     import type { Store } from 'n3';
     import { ns } from '$lib/stores/rdf.svelte';
-    import type { ObjectTypeFlags, ObjectPropertyFlags } from '$lib/rdf/type-detection';
-    import { detectObjectProperty } from '$lib/rdf/type-detection';
+    import type { ObjectTypeFlags, ObjectPropertyFlags } from '$lib/rdf/archive/type-detection';
+    import { detectObjectProperty } from '$lib/rdf/archive/type-detection';
     import { getCompactURI, getLocalName } from '$lib/rdf/utils';
     
     // New editable annotations component

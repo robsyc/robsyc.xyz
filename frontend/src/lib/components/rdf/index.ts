@@ -5,18 +5,21 @@
  */
 
 // Context
-export { getRdfContext, setRdfContext, type RdfEditorContext } from './context';
+export { getRdfContext, setRdfContext, createRdfContext, type RdfEditorContext } from './context';
+
+// Shared components
+export { IriTooltip, ResourceSelector } from './shared';
 
 // Tree components
 export { HierarchyTree } from './tree';
 
 // Section components
-export { AnnotationSection, HierarchySection } from './sections';
+export { BaseSection, AnnotationSection, HierarchySection, TargetSection, PropertyShapeSection } from './sections';
 
 // Panel components  
 export { ResourceDetailPanel } from './panels';
 
 // Editor components
-export { LiteralEditorDialog, CreateResourceDialog } from './editors';
+export { LiteralEditorDialog, CreateResourceDialog, HierarchyEditorDialog } from './editors';
 
 

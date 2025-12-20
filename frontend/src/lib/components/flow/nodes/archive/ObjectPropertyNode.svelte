@@ -15,9 +15,9 @@
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
     import { Info, Code, Database, ArrowLeftRight, Copy, Check } from "@lucide/svelte";
     
-    import type { ObjectPropertyNodeData } from '$lib/rdf/flow-mapper';
-    import { getObjectPropertyBadges } from '$lib/rdf/type-detection';
-    import { getLabel, getComment } from '$lib/rdf/flow-mapper';
+    import type { ObjectPropertyNodeData } from '$lib/rdf/archive/flow-mapper';
+    import { getObjectPropertyBadges } from '$lib/rdf/archive/type-detection';
+    import { getLabel, getComment } from '$lib/rdf/archive/flow-mapper';
     import { getCompactURI, getLocalName } from '$lib/rdf/utils';
     
     import DetailsDialog from '../../dialogs/DetailsDialog.svelte';

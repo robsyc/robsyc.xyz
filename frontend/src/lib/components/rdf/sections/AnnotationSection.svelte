@@ -1,11 +1,14 @@
 <script lang="ts">
     import type { NamedNode, BlankNode } from 'n3';
-    import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from '@lucide/svelte';
-    import { SvelteSet } from 'svelte/reactivity';
+    import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, ExternalLink, ArrowUpRight } from '@lucide/svelte';
     import { Button } from '$lib/components/ui/button/index.js';
     import { Badge } from '$lib/components/ui/badge/index.js';
     import { getRdfContext } from '../context';
-    import { getAnnotationsGrouped, removeAnnotation, type AnnotationGroup, type AnnotationValue } from '$lib/rdf/queries';
+    import { getAnnotationsGrouped, removeAnnotation, type AnnotationValue } from '$lib/rdf/queries';
+    import { PREFIXES } from '$lib/rdf/namespaces';
+    import { IriTooltip } from '../shared';
+    import { createExpandableSet } from '$lib/utils/expandable.svelte';
+    import BaseSection from './BaseSection.svelte';
 
     interface Props {
         /** The resource being annotated */
@@ -20,6 +23,10 @@
         onaddvalue?: (subject: NamedNode | BlankNode, predicate: NamedNode) => void;
         /** Callback for editing an annotation */
         onedit?: (value: AnnotationValue) => void;
+        /** Callback when clicking on a predicate to navigate to it */
+        onpredicateclick?: (predicate: NamedNode) => void;
+        /** Callback when clicking on a NamedNode value to navigate to it */
+        onvalueclick?: (resource: NamedNode) => void;
     }
 
     let {
@@ -28,162 +35,185 @@
         collapsed = false,
         onadd,
         onaddvalue,
-        onedit
+        onedit,
+        onpredicateclick,
+        onvalueclick
     }: Props = $props();
 
     const ctx = getRdfContext();
     const store = ctx.store;
 
-    // Section collapsed state (intentionally initialized from prop once)
-    // svelte-ignore state_referenced_locally
-    let isCollapsed = $state(collapsed);
-
     // Track expanded property groups
-    let expandedGroups = new SvelteSet<string>();
+    const expandedGroups = createExpandableSet();
 
     // Get annotations reactively
     const annotationGroups = $derived(getAnnotationsGrouped(store, subject));
+    const totalCount = $derived(annotationGroups.reduce((acc, g) => acc + g.values.length, 0));
 
-    function toggleGroup(predicateValue: string) {
-        if (expandedGroups.has(predicateValue)) {
-            expandedGroups.delete(predicateValue);
-        } else {
-            expandedGroups.add(predicateValue);
-        }
+    // Check if a URI is internal (in our known namespaces)
+    function isInternalUri(uri: string): boolean {
+        return Object.values(PREFIXES).some(prefix => uri.startsWith(prefix));
     }
 
     function handleRemove(value: AnnotationValue) {
         removeAnnotation(store, value.quad);
     }
+
+    function handleValueClick(value: AnnotationValue) {
+        const obj = value.quad.object;
+        if (obj.termType === 'NamedNode') {
+            if (isInternalUri(obj.value)) {
+                onvalueclick?.(obj as NamedNode);
+            } else {
+                window.open(obj.value, '_blank', 'noopener,noreferrer');
+            }
+        }
+    }
+
+    function isNamedNodeValue(value: AnnotationValue): boolean {
+        return value.quad.object.termType === 'NamedNode';
+    }
 </script>
 
-<div class="border rounded-lg">
-    <!-- Section header -->
-    <button
-        type="button"
-        class="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
-        onclick={() => isCollapsed = !isCollapsed}
-    >
-        <div class="flex items-center gap-2">
-            {#if isCollapsed}
-                <ChevronRight class="h-4 w-4 text-muted-foreground" />
-            {:else}
-                <ChevronDown class="h-4 w-4 text-muted-foreground" />
-            {/if}
-            <span class="font-medium text-sm">{title}</span>
-            <Badge variant="outline" class="text-xs">
-                {annotationGroups.reduce((acc, g) => acc + g.values.length, 0)}
-            </Badge>
-        </div>
-        
-        {#if onadd}
-            <Button
-                variant="ghost"
-                size="icon"
-                class="h-7 w-7"
-                onclick={(e) => { e.stopPropagation(); onadd?.(subject); }}
-                title="Add annotation"
-            >
-                <Plus class="h-4 w-4" />
-            </Button>
-        {/if}
-    </button>
-    
-    <!-- Section content -->
-    {#if !isCollapsed}
-        <div class="border-t">
-            {#if annotationGroups.length === 0}
-                <p class="text-sm text-muted-foreground text-center py-4">No annotations</p>
-            {:else}
-                <div class="divide-y">
-                    {#each annotationGroups as group (group.predicate.value)}
-                        {@const isGroupExpanded = group.values.length <= 1 || expandedGroups.has(group.predicate.value)}
-                        
-                        <div class="py-2 px-3">
-                            <!-- Property header -->
-                            <div class="flex items-center justify-between group/header">
-                                <button
-                                    type="button"
-                                    class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-                                    onclick={() => toggleGroup(group.predicate.value)}
-                                    disabled={group.values.length <= 1}
-                                >
-                                    {#if group.values.length > 1}
-                                        {#if isGroupExpanded}
-                                            <ChevronDown class="h-3 w-3" />
-                                        {:else}
-                                            <ChevronRight class="h-3 w-3" />
+<BaseSection
+    {title}
+    count={totalCount}
+    {collapsed}
+    emptyMessage="No annotations"
+    onadd={onadd ? () => onadd?.(subject) : undefined}
+    addTitle="Add annotation"
+>
+    <div class="divide-y">
+        {#each annotationGroups as group (group.predicate.value)}
+            {@const isGroupExpanded = group.values.length <= 1 || expandedGroups.has(group.predicate.value)}
+            
+            <div class="py-2 px-3">
+                <!-- Property header -->
+                <div class="flex items-center justify-between group/header">
+                    <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                        <button
+                            type="button"
+                            class="flex items-center gap-1 hover:text-foreground"
+                            onclick={() => expandedGroups.toggle(group.predicate.value)}
+                            disabled={group.values.length <= 1}
+                        >
+                            {#if group.values.length > 1}
+                                {#if isGroupExpanded}
+                                    <ChevronDown class="h-3 w-3" />
+                                {:else}
+                                    <ChevronRight class="h-3 w-3" />
+                                {/if}
+                            {:else}
+                                <span class="w-3"></span>
+                            {/if}
+                        </button>
+                        <IriTooltip
+                            term={group.predicate}
+                            class="font-medium hover:text-foreground hover:underline cursor-pointer"
+                            onclick={() => onpredicateclick?.(group.predicate)}
+                        >
+                            {group.label}
+                        </IriTooltip>
+                        {#if group.values.length > 1}
+                            <Badge variant="secondary" class="text-xs h-5">
+                                {group.values.length}
+                            </Badge>
+                        {/if}
+                    </div>
+                    {#if onaddvalue}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            class="h-6 w-6 opacity-0 group-hover/header:opacity-100 transition-opacity"
+                            onclick={() => onaddvalue?.(subject, group.predicate)}
+                            title="Add value"
+                        >
+                            <Plus class="h-3 w-3" />
+                        </Button>
+                    {/if}
+                </div>
+                
+                <!-- Values -->
+                {#if isGroupExpanded}
+                    <div class="mt-1 space-y-1 pl-5">
+                        {#each group.values as value (value.quad.object.value + (value.language ?? ''))}
+                            {@const isLink = isNamedNodeValue(value)}
+                            {@const isExternal = isLink && !isInternalUri(value.quad.object.value)}
+                            {@const isInternal = isLink && isInternalUri(value.quad.object.value)}
+                            <div class="flex items-center justify-between group">
+                                {#if isLink}
+                                    <button
+                                        type="button"
+                                        class="text-sm break-all text-left text-primary hover:underline flex items-center gap-1"
+                                        onclick={() => handleValueClick(value)}
+                                    >
+                                        {value.displayValue}
+                                        {#if isExternal}
+                                            <ExternalLink class="h-3 w-3 shrink-0" />
                                         {/if}
-                                    {:else}
-                                        <span class="w-3"></span>
+                                    </button>
+                                {:else}
+                                    <span class="text-sm break-all">{value.displayValue}</span>
+                                {/if}
+                                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                    {#if isInternal && onvalueclick}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            class="h-6 w-6"
+                                            onclick={() => handleValueClick(value)}
+                                            title="Go to resource"
+                                        >
+                                            <ArrowUpRight class="h-3 w-3" />
+                                        </Button>
                                     {/if}
-                                    <span class="font-medium">{group.label}</span>
-                                    {#if group.values.length > 1}
-                                        <Badge variant="secondary" class="text-xs h-5">
-                                            {group.values.length}
-                                        </Badge>
+                                    {#if onedit}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            class="h-6 w-6"
+                                            onclick={() => onedit?.(value)}
+                                            title="Edit"
+                                        >
+                                            <Pencil class="h-3 w-3" />
+                                        </Button>
                                     {/if}
-                                </button>
-                                {#if onaddvalue}
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        class="h-6 w-6 opacity-0 group-hover/header:opacity-100 transition-opacity"
-                                        onclick={() => onaddvalue?.(subject, group.predicate)}
-                                        title="Add value"
+                                        class="h-6 w-6 text-destructive"
+                                        onclick={() => handleRemove(value)}
+                                        title="Remove"
                                     >
-                                        <Plus class="h-3 w-3" />
+                                        <Trash2 class="h-3 w-3" />
                                     </Button>
-                                {/if}
+                                </div>
                             </div>
-                            
-                            <!-- Values -->
-                            {#if isGroupExpanded}
-                                <div class="mt-1 space-y-1 pl-5">
-                                    {#each group.values as value (value.quad.object.value + (value.language ?? ''))}
-                                        <div class="flex items-center justify-between group">
-                                            <span class="text-sm break-all">{value.displayValue}</span>
-                                            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                {#if onedit}
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        class="h-6 w-6"
-                                                        onclick={() => onedit?.(value)}
-                                                        title="Edit"
-                                                    >
-                                                        <Pencil class="h-3 w-3" />
-                                                    </Button>
-                                                {/if}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    class="h-6 w-6 text-destructive"
-                                                    onclick={() => handleRemove(value)}
-                                                    title="Remove"
-                                                >
-                                                    <Trash2 class="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    {/each}
-                                </div>
-                            {:else}
-                                <div class="mt-1 pl-5">
-                                    <span class="text-sm text-muted-foreground">
-                                        {group.values[0].displayValue}
-                                        {#if group.values.length > 1}
-                                            <span class="ml-1">+{group.values.length - 1} more</span>
-                                        {/if}
-                                    </span>
-                                </div>
-                            {/if}
-                        </div>
-                    {/each}
-                </div>
-            {/if}
-        </div>
-    {/if}
-</div>
-
-
+                        {/each}
+                    </div>
+                {:else}
+                    {@const firstValue = group.values[0]}
+                    {@const isLink = isNamedNodeValue(firstValue)}
+                    <div class="mt-1 pl-5">
+                        {#if isLink}
+                            <button
+                                type="button"
+                                class="text-sm text-primary hover:underline"
+                                onclick={() => handleValueClick(firstValue)}
+                            >
+                                {firstValue.displayValue}
+                            </button>
+                        {:else}
+                            <span class="text-sm text-muted-foreground">
+                                {firstValue.displayValue}
+                            </span>
+                        {/if}
+                        {#if group.values.length > 1}
+                            <span class="text-sm text-muted-foreground ml-1">+{group.values.length - 1} more</span>
+                        {/if}
+                    </div>
+                {/if}
+            </div>
+        {/each}
+    </div>
+</BaseSection>

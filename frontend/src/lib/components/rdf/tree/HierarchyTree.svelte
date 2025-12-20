@@ -7,14 +7,17 @@
     import { Badge } from '$lib/components/ui/badge/index.js';
     import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
     import { getRdfContext } from '../context';
-    import { buildTreeNodes, type TreeNode } from '$lib/rdf/queries';
+    import { IriTooltip } from '../shared';
+    import { buildTreeNodes, getParents, getAncestors, type TreeNode } from '$lib/rdf/queries';
     import { toCompactIri } from '$lib/rdf/namespaces';
+    import { createExpandableSet } from '$lib/utils/expandable.svelte';
+    import { createDebounced } from '$lib/utils/debounce.svelte';
 
     interface Props {
         /** The rdf:type to browse (e.g., ns.rdfs('Class')) */
         resourceType: NamedNode;
         /** Property that defines parent-child (e.g., rdfs:subClassOf) */
-        hierarchyPredicate: NamedNode;
+        hierarchyPredicate?: NamedNode | null;
         /** Currently selected resource */
         selected?: NamedNode | BlankNode | null;
         /** Callback when selection changes */
@@ -31,9 +34,9 @@
         showSearch?: boolean;
         /** Compact mode (less padding, smaller text) */
         compact?: boolean;
-        /** Callback for adding a new resource */
-        onadd?: () => void;
-        /** Callback for adding a child resource */
+        /** Callback for adding a new resource (sibling of selected, or top-level if nothing selected) */
+        onadd?: (parent: NamedNode | BlankNode | null) => void;
+        /** Callback for adding a child resource under the selected node */
         onaddchild?: (parent: NamedNode | BlankNode) => void;
         /** Callback for removing a resource */
         onremove?: (resource: NamedNode | BlankNode) => void;
@@ -41,7 +44,7 @@
 
     let {
         resourceType,
-        hierarchyPredicate,
+        hierarchyPredicate = null,
         selected = $bindable(null),
         onselect,
         nodeContent,
@@ -57,21 +60,42 @@
 
     const ctx = getRdfContext();
     const store = ctx.store;
+    
+    // Check if multi-selection is enabled in context
+    const supportsMultiSelect = $derived(!!ctx.toggleSelection);
 
     // Track manually expanded nodes
-    let manualExpanded = new SvelteSet<string>();
+    const expanded = createExpandableSet();
     let searchQuery = $state('');
+    
+    // Debounce search query for performance (150ms delay)
+    const debouncedSearch = createDebounced(() => searchQuery, 150);
 
     // Build tree reactively
     const treeNodes = $derived(buildTreeNodes(store, resourceType, hierarchyPredicate));
     const badge = $derived(typeBadge ?? toCompactIri(resourceType.value));
     
-    // Normalized search query
-    const query = $derived(searchQuery.trim().toLowerCase());
+    // Get parent of selected node (for sibling creation)
+    const selectedParent = $derived.by(() => {
+        if (!selected || !hierarchyPredicate) return null;
+        const parents = getParents(store, selected, hierarchyPredicate);
+        return parents.length > 0 ? parents[0] : null;
+    });
+    
+    const selectedAncestors = $derived.by(() => {
+        if (!selected || !hierarchyPredicate) return null;
+        return getAncestors(store, selected, hierarchyPredicate);
+    });
+    
+    // Auto-expand ancestors of the current selection (without mutating manual expand state)
+    const autoExpanded = $derived(selectedAncestors ?? new Set<string>());
+    
+    // Normalized search query (uses debounced value for filtering)
+    const query = $derived(debouncedSearch.current.trim().toLowerCase());
     
     // Build set of node IDs that match search or have matching descendants
-    function getMatchingIds(nodes: TreeNode[], q: string): Set<string> {
-        const matches = new Set<string>();
+    function getMatchingIds(nodes: TreeNode[], q: string): SvelteSet<string> {
+        const matches = new SvelteSet<string>();
         
         function check(node: TreeNode): boolean {
             const selfMatches = node.label.toLowerCase().includes(q);
@@ -86,7 +110,7 @@
         return matches;
     }
     
-    const matchingIds = $derived(query ? getMatchingIds(treeNodes, query) : new Set<string>());
+    const matchingIds = $derived(query ? getMatchingIds(treeNodes, query) : new SvelteSet<string>());
     
     // Check if node directly matches search
     function nodeMatches(node: TreeNode): boolean {
@@ -99,8 +123,9 @@
     }
     
     // Node is expanded if: manually expanded OR (searching and has matching descendants)
-    function isExpanded(node: TreeNode): boolean {
-        if (manualExpanded.has(node.term.value)) return true;
+    function isNodeExpanded(node: TreeNode): boolean {
+        if (expanded.has(node.term.value)) return true;
+        if (autoExpanded.has(node.term.value)) return true;
         if (query && hasMatchingDescendant(node)) return true;
         return false;
     }
@@ -110,26 +135,41 @@
         return !query || matchingIds.has(node.term.value);
     }
 
-    function toggleExpanded(nodeValue: string) {
-        if (manualExpanded.has(nodeValue)) {
-            manualExpanded.delete(nodeValue);
+    /**
+     * Handle node click with optional multi-select support.
+     * - Regular click: single selection
+     * - Shift+click: toggle multi-selection (if enabled in context)
+     */
+    function handleNodeClick(node: NamedNode | BlankNode, event: MouseEvent) {
+        if (supportsMultiSelect && event.shiftKey && ctx.toggleSelection) {
+            // Multi-select mode: toggle this node in the selection set
+            ctx.toggleSelection(node, true);
         } else {
-            manualExpanded.add(nodeValue);
+            // Single-select mode: set as only selected
+            selected = node;
+            onselect?.(node);
         }
     }
 
-    function selectNode(node: NamedNode | BlankNode) {
-        selected = node;
-        onselect?.(node);
-    }
-
+    /**
+     * Check if a node is selected (supports both single and multi-select).
+     * Uses context's isSelected if available, otherwise falls back to single selection.
+     */
     function isSelected(node: NamedNode | BlankNode): boolean {
+        if (ctx.isSelected) {
+            return ctx.isSelected(node);
+        }
         return selected?.value === node.value;
+    }
+    
+    // Handle add: creates sibling of selected (same parent), or top-level if nothing selected
+    function handleAdd() {
+        onadd?.(selectedParent);
     }
 </script>
 
 {#snippet treeNodeSnippet(node: TreeNode, depth: number)}
-    {@const expanded = isExpanded(node)}
+    {@const nodeExpanded = isNodeExpanded(node)}
     {@const matches = nodeMatches(node)}
     {@const visible = isVisible(node)}
     
@@ -146,31 +186,29 @@
                     type="button"
                     class="p-0.5 hover:bg-muted rounded shrink-0"
                     class:invisible={!node.hasChildren}
-                    onclick={(e) => { e.stopPropagation(); toggleExpanded(node.term.value); }}
+                    onclick={(e) => { e.stopPropagation(); expanded.toggle(node.term.value); }}
                 >
-                    {#if expanded}
+                    {#if nodeExpanded}
                         <ChevronDown class="h-3 w-3 text-muted-foreground" />
                     {:else}
                         <ChevronRight class="h-3 w-3 text-muted-foreground" />
                     {/if}
                 </button>
                 
-                <button
-                    type="button"
-                    class="flex-1 text-left min-w-0 truncate pr-2"
-                    class:text-sm={!compact}
-                    class:text-xs={compact}
-                    onclick={() => selectNode(node.term)}
+                <IriTooltip
+                    term={node.term}
+                    class="flex-1 text-left min-w-0 truncate pr-2 {compact ? 'text-xs' : 'text-sm'}"
+                    onclick={(e: MouseEvent) => handleNodeClick(node.term, e)}
                 >
                     {#if nodeContent}
                         {@render nodeContent({ node: node.term, label: node.label, depth })}
                     {:else}
                         {node.label}
                     {/if}
-                </button>
+                </IriTooltip>
             </div>
             
-            {#if node.hasChildren && expanded}
+            {#if node.hasChildren && nodeExpanded}
                 {#each node.children as child (child.term.value)}
                     {@render treeNodeSnippet(child, depth + 1)}
                 {/each}
@@ -187,11 +225,17 @@
             {#if showToolbar}
                 <div class="flex items-center gap-1">
                     {#if onadd}
-                        <Button variant="ghost" size="icon" class="h-6 w-6" onclick={onadd} title="Add new">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            class="h-6 w-6" 
+                            onclick={handleAdd} 
+                            title={selected ? "Add sibling" : "Add new"}
+                        >
                             <Plus class="h-3.5 w-3.5" />
                         </Button>
                     {/if}
-                    {#if onaddchild && selected}
+                    {#if onaddchild && selected && hierarchyPredicate}
                         <Button variant="ghost" size="icon" class="h-6 w-6" onclick={() => onaddchild?.(selected!)} title="Add child">
                             <GitBranchPlus class="h-3.5 w-3.5" />
                         </Button>
@@ -233,5 +277,3 @@
         </div>
     </ScrollArea>
 </div>
-
-

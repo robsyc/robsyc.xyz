@@ -2,7 +2,47 @@
 
 ## Goal
 
-Build a shadcn-based UI for browsing and editing RDF resources. The UI follows a **two-panel pattern**: a reusable hierarchy browser on the left, and a detail viewer/editor on the right. This enables creating data like `01-basic-classes.ttl`.
+Build a shadcn-based UI for browsing and editing RDF resources. The UI follows a **two-panel pattern**: a reusable hierarchy browser on the left, and a detail viewer/editor on the right. This enables creating and editing RDF data like `01-basic-classes.ttl`.
+
+---
+
+## Current Status
+
+### Implemented ✅
+- **HierarchyTree**: Generic tree browser with debounced search, expand/collapse, CRUD actions
+- **ResourceDetailPanel**: Multi-section container with header showing label/IRI
+- **AnnotationSection**: View and edit annotations grouped by predicate
+- **HierarchySection**: View and edit hierarchical relationships (supports multiple predicates for ShapeClass)
+- **TargetSection**: Display SHACL targeting (sh:targetClass, etc.) NEW
+- **PropertyShapeSection**: Display sh:PropertyShape details for NodeShapes NEW
+- **LiteralEditorDialog**: Three-panel dialog for creating/editing literals with datatype support
+- **CreateResourceDialog**: Dialog for creating new resources with namespace selection
+- **HierarchyEditorDialog**: Dialog for adding/editing hierarchy relationships with cycle detection
+- **RdfStore**: Reactive N3.js wrapper with batch transactions
+- **Resource type configuration**: `resource-types.ts` with extensible type registry
+- **View profiles**: `view-profiles.ts` with section composition logic NEW
+- **Reactive utilities**: `createExpandableSet`, `createDebounced`, `createSelectionState`, `createDialogState` NEW
+
+### Ready for Integration 🔧
+These utilities were created during the refactoring sprint but are **not yet wired into production code**:
+
+| Utility | File | Purpose | Integration Point |
+|---------|------|---------|-------------------|
+| `createSelectionState()` | `$lib/utils/selection.svelte.ts` | Single/multi-selection with shift-click | Replace manual selection in `+page.svelte` |
+| `createKeyedSelectionState()` | `$lib/utils/selection.svelte.ts` | Per-tab selection tracking | Replace `selectedByTab` record |
+| `createRdfContext()` | `$lib/components/rdf/context.ts` | Context factory with multi-selection | Replace manual context creation |
+| `createDialogState()` | `$lib/utils/dialog.svelte.ts` | Generic dialog open/data management | Replace 8+ dialog state variables |
+| `createConfirmDialog()` | `$lib/utils/dialog.svelte.ts` | Confirmation dialog with action | Replace confirm dialog boilerplate |
+| `getSectionsForResource()` | `$lib/rdf/view-profiles.ts` | Dynamic section composition | Replace manual section conditionals |
+
+### Planned 📋
+- **Drag-and-drop** hierarchy manipulation in tree (using svelte-dnd-action)
+- **Multi-select** with shift-click (utility ready, needs UI wiring + testing)
+- **Dynamic section composition** (utility ready, needs UI wiring + testing)
+- **SHACL NodeShape and PropertyShape integration** new tabs for working with SHACL shapes (`02-simple-shacl.ttl`)
+- **Tree virtualization** for large graphs (consider @tanstack/svelte-virtual)
+- More datatype-specific editors (date pickers, etc.)
+- Further consolidate UI with generic base components & deduplicate
 
 ---
 
@@ -18,237 +58,262 @@ Every component should work for **any RDF resource type**:
 The right panel is a **multi-section container**. Different resource types get different sections:
 - `rdfs:Class`: Annotations + Hierarchy (subClassOf)
 - `owl:AnnotationProperty`: Annotations + Hierarchy (subPropertyOf)
-- `sh:NodeShape`: Annotations + Target Class + Hierarchy (sh:node) + Property Shapes (sh:property) + ...
+- `sh:NodeShape`: Annotations + Target + Hierarchy (sh:node) + Property Shapes (clownface-shacl-path)
+- `sh:ShapeClass`: All of the above (dual rdfs:Class + sh:NodeShape) (SHACL 1.2 shortcut)
+
+Use `getSectionsForResource()` to dynamically determine which sections to show.
 
 ### 3. Svelte 5 Patterns
 - **Snippets** for customizable rendering (e.g., custom tree node content)
-- **Context** for shared state (selected resource, store reference)
+- **Context** for shared state (store, selection, future multi-select)
 - **`$props()`** with TypeScript interfaces for type-safe components
 - **`$derived`** for computed values from store queries
+- **`$state`** only at top-level variable declarations
+- **Utility factories** (`createXxx()`) for reusable reactive state patterns
+
+### 4. DRY and Minimal Code
+- Extract common patterns into `$lib/utils/` (expandable, debounce, selection, dialog)
+- Batch store operations to minimize reactive updates
+- Use `resource-types.ts` registry instead of hardcoded type configs
+- Use `view-profiles.ts` for UI-specific type decisions
+
+---
+
+## Architecture
+
+### Type System
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     ResourceTypeId                              │
+│  (RDF-based: 'class', 'nodeShape', 'annotationProperty', etc.)  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ maps to
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      ViewProfileId                              │
+│  ResourceTypeId + UI-only: 'shapeClass', 'unknown'              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ determines
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      SectionConfig[]                            │
+│  Which sections to show: annotation, hierarchy, target, etc.    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Resource Type Configuration (`$lib/rdf/resource-types.ts`)
+
+Central registry defining all supported RDF resource types:
+
+```typescript
+interface ResourceTypeConfig {
+    id: string;
+    label: string;
+    pluralLabel: string;
+    typeIris: NamedNode[];           // rdf:type values
+    hierarchyPredicates: NamedNode[]; // e.g., rdfs:subClassOf
+    badge: string;
+    emptyLabel: string;
+    order: number;
+}
+
+// Current registry:
+RESOURCE_TYPES = {
+    annotationProperty,  // owl:AnnotationProperty → rdfs:subPropertyOf
+    class,               // rdfs:Class → rdfs:subClassOf
+    nodeShape,           // sh:NodeShape → sh:node
+    propertyShape,       // sh:PropertyShape (no hierarchy)
+    owlClass,            // owl:Class → rdfs:subClassOf but more complex axioms w/ restrictions and unnamed ancestors
+    datatypeProperty,    // owl:DatatypeProperty → rdfs:subPropertyOf
+    objectProperty,      // owl:ObjectProperty → rdfs:subPropertyOf
+}
+```
+
+### View Profiles (`$lib/rdf/view-profiles.ts`)
+
+UI-specific type detection and section composition:
+
+```typescript
+// Determine how to present a resource
+getViewProfile(store, resource): ViewProfile
+// → { id: 'shapeClass', preferredTab: 'class' }
+
+// Get sections to display
+getSectionsForResource(store, resource): SectionConfig[]
+// → [
+//     { type: 'annotation', props: {} },
+//     { type: 'target', props: {} },
+//     { type: 'hierarchy', title: 'Superclasses', props: { predicates: [...] } },
+//     { type: 'propertyShapes', props: {} }
+//   ]
+
+// Helper checks
+hasPropertyShapes(store, resource): boolean
+hasTargets(store, resource): boolean
+isResourceTypeId(id): boolean  // excludes 'shapeClass', 'unknown'
+```
+
+### Context (`$lib/components/rdf/context.ts`)
+
+Shared state via Svelte context:
+
+```typescript
+interface RdfEditorContext {
+    store: RdfStore;
+    
+    // Single selection
+    readonly selectedResource: NamedNode | BlankNode | null;
+    setSelected: (resource: NamedNode | BlankNode | null) => void;
+    
+    // Multi-selection (optional, for shift-click)
+    readonly selectedResources?: ReadonlySet<string>;
+    toggleSelection?: (resource: NamedNode | BlankNode, multi: boolean) => void;
+    clearSelection?: () => void;
+    isSelected?: (resource: NamedNode | BlankNode) => boolean;
+}
+
+// Factory for full multi-selection support (NOT YET USED)
+createRdfContext(store: RdfStore, selection: SelectionState): RdfEditorContext
+```
 
 ---
 
 ## Core Components
 
-### 1. HierarchyTree (Generic, Reusable)
+### 1. HierarchyTree
 
-A generic tree browser for any RDF type hierarchy.
+Generic tree browser for any RDF type hierarchy.
 
-**Features:**
-- Combobox search by `rdfs:label` or local name w/ deduplication
-- Type badge (e.g., "a rdfs:Class")
-- Tree actions toolbar:
-  - `git-branch-plus` Add child of selected (e.g., subClass)
-  - `plus` Add sibling (same parent as selected)
-  - `x` Remove selected
-- Collapsible tree nodes via hierarchy predicate
-- Visual indication of expandable nodes (has children)
-- **Snippet prop** for custom node rendering
-
-**Base shadcn Components:** `Combobox`, `Button`, `Tree` (shadcn-extras), `ScrollArea`
-
----
-
-### 2. ResourceDetailPanel (Multi-Section Container)
-
-A container that displays multiple collapsible sections for the selected resource.
-
-This allows different views to compose different sections:
-- `ClassEditorView`: Annotations + Superclass hierarchy
-- `PropertyEditorView`: Annotations + Superproperty hierarchy
-- `ShapeEditorView`: Annotations + Property shapes + ...
-
----
-
-### 3. AnnotationSection (Reusable for ANY Resource)
-
-Displays and edits annotations for **any** resource. This is the key reusable piece.
-
-**Key Insight:** This component works for:
-- Annotating an `rdfs:Class` (e.g., `rxyz:Person rdfs:label "Person"@en`)
-- Annotating an `owl:AnnotationProperty` (e.g., `rdfs:label rdfs:label "label"`) ← meta!
-- Annotating a `sh:NodeShape`, `owl:Class`, etc.
+**Props:**
+- `resourceType: NamedNode` - The rdf:type to browse
+- `hierarchyPredicate: NamedNode` - Property defining parent-child
+- `selected: NamedNode | BlankNode | null` - Currently selected (bindable)
+- `onselect, onadd, onaddchild, onremove` - Event callbacks
+- `nodeContent?: Snippet` - Custom node rendering
 
 **Features:**
-- Collapsible section with "Annotations" heading
-- Bulk actions: remove selected, add new
-- **Grouped by property**: Multiple values for same predicate grouped
-- Collapse/expand groups with multiple values
-- Per-value actions: edit, delete
-- "Add value" button per property group
+- **Debounced search** (150ms) for performance on large trees
+- Auto-expand ancestors when selection changes externally
+- Expand/collapse state via `createExpandableSet()` utility
+- Toolbar actions: add sibling, add child, remove
+- Multi-selection ready (checks `ctx.toggleSelection`)
 
----
+### 2. ResourceDetailPanel
 
-### 4. HierarchySection (Reusable for Relations)
+Container displaying header + collapsible sections.
 
-Displays hierarchical relationships (subClassOf, subPropertyOf, etc.)
+**Props:**
+- `subject: NamedNode | BlankNode | null`
+- `children: Snippet` - Section components to render
 
----
+### 3. Section Components
 
-### 5. LiteralEditorDialog (Add/Edit Annotation)
+| Component | Purpose | Trigger Condition |
+|-----------|---------|-------------------|
+| `AnnotationSection` | View/edit annotations | Always shown |
+| `HierarchySection` | View/edit hierarchy | If `hierarchyPredicates.length > 0` |
+| `TargetSection` | View SHACL targets | If `hasTargets()` |
+| `PropertyShapeSection` | View sh:PropertyShape | If `hasPropertyShapes()` |
 
-A dialog for creating/editing literal values with full datatype support.
+### 4. Editor Dialogs
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           Add Annotation                                    [✕] │
-├────────────────────────────┬────────────────┬───────────────────────────────────┤
-│   PropertyTree             │   Datatype     │   Editor                          │
-│                            │   Selector     │                                   │
-│  [🔍 Combobox           ]  │                │   Language-tagged String          │
-│  a owl:AnnotationProperty  │  ▸ langString  │                                   │
-│                            │    string      │   Description...                  │
-│  ▸ label  ← selected       │    boolean     │                                   │
-│  ▼ note                    │    integer     │   Examples:                       │
-│    ▸ definition            │    ...         │   • "Hello"@en                    │
-│    ▸ editorial note        │                │   • "Bonjour"@fr                  │
-│                            │                │                                   │
-│                            │                │  ┌─────────────────────┬───────┐  │
-│                            │                │  │ Person              │ en ▼  │  │
-│                            │                │  └─────────────────────┴───────┘  │
-│                            │                │                                   │
-│                            │                │ Preview:                          │
-│                            │                │ rxyz:Person rdfs:label "Person"@en│
-│                            │                │                                   │
-│                            │                │  [  Preview  ]  [  Submit  ]      │
-└────────────────────────────┴────────────────┴───────────────────────────────────┘
-```
+| Dialog | Purpose |
+|--------|---------|
+| `LiteralEditorDialog` | Create/edit literal values with datatype selection |
+| `CreateResourceDialog` | Create new resources with namespace selection |
+| `HierarchyEditorDialog` | Add/edit hierarchy relations with cycle detection |
 
-**Three Sections:**
-1. **PropertyTree** (left): Reuse `HierarchyTree` for `owl:AnnotationProperty`
-2. **DatatypeSelector** (middle): Vertical list from `DATATYPES` (grouped by category)
-3. **EditorPanel** (right): Datatype info + dynamic input + preview
+More to come, e.g., SHACL PropertyShape editor (this will be quite complex, including constraints, nesting, etc.)
 
----
+### 5. Shared Components
 
-### 6. LiteralValueEditor (Dynamic Input)
-
-Renders the appropriate input based on `editorType`.
-
-**Editor Mapping (from `datatypes.ts`):**
-
-| `editorType` | Component |
-|--------------|-----------|
-| `text-input` | `Input` |
-| `textarea` | `Textarea` |
-| `lang-string` | `Input` + `LanguageSelector` |
-| `switch` | `Switch` |
-| `integer-input` | `NumberField` |
-| `decimal-input` | `NumberField` |
-| `date-picker` | `DatePicker` |
-| `iri-input` | `Combobox` |
+- **IriTooltip**: Button/tooltip showing full/compact IRI
+- **ResourceSelector**: Searchable popover for resource selection
+- **BaseSection**: Collapsible section wrapper with header, count, add button
 
 ---
 
 ## File Structure
 
 ```
-src/lib/components/rdf/
-├── context.ts                     # Shared context definition
-├── tree/
-│   ├── HierarchyTree.svelte       # Generic tree browser
-│   ├── TreeNode.svelte            # Single recursive node
-│   ├── TreeToolbar.svelte         # Search + actions
-│   └── index.ts
-├── sections/
-│   ├── AnnotationSection.svelte   # Annotation editor section
-│   ├── HierarchySection.svelte    # Hierarchy display section
-│   ├── PropertyShapeSection.svelte # For sh:NodeShape (future)
-│   └── index.ts
-├── editors/
-│   ├── CreateResourceDialog.svelte # Create a new resource (e.g., Class or Property)
-│   ├── LiteralEditorDialog.svelte # Full add/edit dialog
-│   ├── LiteralValueEditor.svelte  # Dynamic input dispatcher
-│   ├── DatatypeSelector.svelte    # Datatype picker
-│   ├── DatatypeInfoPanel.svelte   # Datatype description
-│   ├── LanguageSelector.svelte    # BCP47 selector
-│   ├── LangStringEditor.svelte    # Text + language
-│   ├── more datatype-specific editor components...
-│   └── index.ts
-├── panels/
-│   ├── ResourceDetailPanel.svelte # Multi-section container (which sections are used is determined by the resource type)
-│   └── index.ts
-├── views/
-│   ├── ClassEditorView.svelte     # rdfs:Class editing
-│   ├── PropertyEditorView.svelte  # owl:AnnotationProperty editing
-│   └── index.ts
-└── index.ts                       # Re-exports
+src/lib/
+├── components/rdf/
+│   ├── context.ts                 # RdfEditorContext + createRdfContext
+│   ├── index.ts                   # Re-exports
+│   ├── tree/
+│   │   ├── HierarchyTree.svelte   # With debounced search TODO: decompose into different components
+│   │   └── index.ts
+│   ├── sections/
+│   │   ├── BaseSection.svelte
+│   │   ├── AnnotationSection.svelte
+│   │   ├── HierarchySection.svelte
+│   │   ├── TargetSection.svelte            # NEW
+│   │   ├── PropertyShapeSection.svelte     # NEW
+│   │   └── index.ts
+│   ├── editors/ # TODO: add more datatype specific components for e.g., xsd:date
+│   │   ├── LiteralEditorDialog.svelte
+│   │   ├── CreateResourceDialog.svelte
+│   │   ├── HierarchyEditorDialog.svelte
+│   │   ├── DatatypeSelector.svelte
+│   │   ├── LangStringEditor.svelte
+│   │   └── index.ts
+│   ├── panels/
+│   │   ├── ResourceDetailPanel.svelte
+│   │   └── index.ts
+│   └── shared/
+│       ├── IriTooltip.svelte
+│       ├── ResourceSelector.svelte
+│       └── index.ts
+├── rdf/
+│   ├── namespaces.ts              # RDF namespace helpers + toCompactIri
+│   ├── datatypes.ts               # Datatype registry + validation + hints
+│   ├── resource-types.ts          # Resource type configuration
+│   ├── view-profiles.ts           # ViewProfileId + getSectionsForResource
+│   └── queries/
+│       ├── hierarchy.ts           # Tree building, CRUD, cycle detection
+│       ├── annotations.ts         # Annotation queries
+│       ├── shacl.ts               # SHACL-specific queries
+│       └── index.ts
+├── stores/
+│   └── rdf.svelte.ts              # Reactive N3.Store wrapper
+└── utils/
+    ├── expandable.svelte.ts       # Expand/collapse utility
+    ├── debounce.svelte.ts         # Debounce utility (USED in HierarchyTree, could maybe also be used in ResourceSelector)
+    ├── selection.svelte.ts        # Selection utility (NOT YET USED)
+    ├── dialog.svelte.ts           # Dialog state utility (NOT YET USED)
+    └── index.ts
 ```
 
 ---
 
-## Store Operations
+## Next Sprint: Integration Tasks
 
-```typescript
-import { DataFactory } from 'n3';
-import { rdfStore } from '$lib/stores/rdf.svelte';
-import { ns } from '$lib/rdf/namespaces';
-
-const { namedNode, literal } = DataFactory;
-
-// Create any typed resource
-function createResource(
-  localName: string, 
-  type: NamedNode,
-  parent?: NamedNode,
-  parentPredicate?: NamedNode
-): NamedNode {
-  const subject = ns.rxyz(localName);
-  rdfStore.addQuad(subject, ns.rdf('type'), type);
-  if (parent && parentPredicate) {
-    rdfStore.addQuad(subject, parentPredicate, parent);
-  }
-  return subject;
-}
-
-// Works for any resource type!
-createResource('Person', ns.rdfs('Class'), ns.rxyz('Thing'), ns.rdfs('subClassOf'));
-createResource('myLabel', ns.owl('AnnotationProperty'), ns.rdfs('label'), ns.rdfs('subPropertyOf'));
-```
+- Simplify component props by ragarding URI as ID and determining label (CURIE) from it
+- Wire Multi-Selection into UI for batch editing operations (for now just delete)
+- Replace Dialog State Variables using createDialogState utility to reduce boilerplate
+- Dynamic Section Composition with getSectionsForResource utility
+- Add Drag-and-Drop to HierarchyTree (using svelte-dnd-action and `ondrop` callback for hierarchy modifications)
+- Tree Virtualization for Large Graphs (using `@tanstack/svelte-virtual`)
+- Additional Datatype Editors (e.g., date picker for `xsd:date`, `xsd:dateTime`, number spinner with constraints for `xsd:integer`, duration editor for `xsd:duration`, etc.)
 
 ---
 
-## Key Reusability Examples
+## SHACL Support Status
 
-### The Meta Case: Editing Annotation Properties
+NOT YET TESTED OR IMPLEMENTED: see `02-simple-shacl.ttl` and `xx-complex-paths.ttl` for examples.
 
-`rdfs:label` is an `owl:AnnotationProperty` that itself has:
-- `rdfs:label "label"` (its own label!)
-- `rdfs:comment "A human-readable name..."` (its own description!)
+### sh:NodeShape ✅
+- **TargetSection**: Shows `sh:targetClass`, `sh:targetNode`, `sh:targetSubjectsOf`, `sh:targetObjectsOf`
+- **PropertyShapeSection**: Lists `sh:property` shapes with path, constraints, cardinality
+- **Hierarchy**: Via `sh:node` predicate
 
-The **same** `AnnotationSection` component that edits annotations on `rxyz:Person` also edits annotations on `rdfs:label`. No special code needed!
+### sh:ShapeClass (SHACL 1.2) ✅
+- Detected via `isShapeClass()` (dual rdfs:Class + sh:NodeShape)
+- **Or** explicit `sh:ShapeClass` type (SHACL 1.2)
+- Hierarchy from BOTH `rdfs:subClassOf` AND `sh:node`
+- All sections from both types via `getSectionsForResource()`
 
-```svelte
-<!-- Editing rxyz:Person (a rdfs:Class) -->
-<AnnotationSection subject={ns.rxyz('Person')} />
-
-<!-- Editing rdfs:label (an owl:AnnotationProperty) - same component! -->
-<AnnotationSection subject={ns.rdfs('label')} />
-```
-
-### Generic Views via Snippets
-
-Use snippets to customize tree node rendering without duplicating the tree logic:
-
-```svelte
-<HierarchyTree
-  resourceType={ns.rdfs('Class')}
-  hierarchyPredicate={ns.rdfs('subClassOf')}
-  bind:selected
->
-  {#snippet nodeContent({ node, label })}
-    <span class="font-medium">{label}</span>
-    <Badge variant="outline">rdfs:Class</Badge>
-  {/snippet}
-</HierarchyTree>
-```
-
----
-
-## Notes
-
-- **Reactivity**: All store queries access `rdfStore.version` for reactive updates
-- **Validation**: Use `pattern` and `constraints` from `DatatypeInfo`
-- **Preview**: Show triple(s) before submit via `previewTriple()`
-- **Multi-value**: Same property can have multiple values (e.g., different languages or just multiple tripes with same s and p)
-- **DRY**: Every component should work for any of our RDF resource types
+### sh:PropertyShape 🚧
+- Can be displayed but not yet editable
+- Editor dialog needed for constraint definition

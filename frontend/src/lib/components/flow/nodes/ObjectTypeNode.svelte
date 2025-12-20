@@ -28,9 +28,9 @@
         Check,
     } from "@lucide/svelte";
     
-    import type { ObjectTypeNodeData } from '$lib/rdf/flow-mapper';
-    import { getObjectTypeBadges } from '$lib/rdf/type-detection';
-    import { getLabel, getComment } from '$lib/rdf/flow-mapper';
+    import type { ObjectTypeNodeData } from '$lib/rdf/archive/flow-mapper';
+    import { getObjectTypeBadges } from '$lib/rdf/archive/type-detection';
+    import { getLabel, getComment } from '$lib/rdf/archive/flow-mapper';
     import { getCompactURI } from '$lib/rdf/utils';
     import { ns } from '$lib/stores/rdf.svelte';
     import { visibilityStore } from '$lib/stores/visibility.svelte';

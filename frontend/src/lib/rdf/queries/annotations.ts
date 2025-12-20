@@ -11,7 +11,7 @@ import type { RdfStore } from '$lib/stores/rdf.svelte';
 import { ns, toCompactIri } from '$lib/rdf/namespaces';
 import { getResourceLabel } from './hierarchy';
 
-const { namedNode, literal, quad } = DataFactory;
+const { literal } = DataFactory;
 
 export interface AnnotationValue {
     /** The full quad for this annotation */
@@ -176,12 +176,14 @@ export function updateAnnotation(
     newValue: string,
     options?: { language?: string; datatype?: NamedNode }
 ): void {
-    removeAnnotation(store, oldQuad);
-    addAnnotation(
-        store,
-        oldQuad.subject as NamedNode | BlankNode,
-        oldQuad.predicate as NamedNode,
-        newValue,
-        options
-    );
+    store.transaction(() => {
+        removeAnnotation(store, oldQuad);
+        addAnnotation(
+            store,
+            oldQuad.subject as NamedNode | BlankNode,
+            oldQuad.predicate as NamedNode,
+            newValue,
+            options
+        );
+    });
 }

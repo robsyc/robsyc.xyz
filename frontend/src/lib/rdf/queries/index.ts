@@ -6,5 +6,4 @@
 
 export * from './hierarchy';
 export * from './annotations';
-
-
+export * from './shacl';

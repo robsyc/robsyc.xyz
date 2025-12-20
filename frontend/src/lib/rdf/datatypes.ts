@@ -33,6 +33,8 @@ export interface LanguageTag {
 }
 
 export const LANGUAGE_TAGS: LanguageTag[] = [
+    // TODO: should review this and add more languages (possibly using library)
+    // https://en.wikipedia.org/wiki/IETF_language_tag#List_of_common_primary_language_subtags
     { tag: 'en', label: 'English', nativeName: 'English' },
     { tag: 'en-US', label: 'English (US)', nativeName: 'English (US)' },
     { tag: 'en-GB', label: 'English (UK)', nativeName: 'English (UK)' },
@@ -84,8 +86,8 @@ export type EditorType =
     | 'datetime-picker'      // Date + Time (custom: DateTimePicker)
     | 'duration-input'       // ISO 8601 duration (custom: DurationEditor)
     
-    // Special
-    | 'iri-input';           // IRI/URI input with validation (custom: IriInput) should be valid URI but we should also support autocomplete based on labels of resources in the graph
+    // Reference types
+    | 'resource-reference';  // IRI reference to another resource (internal or external)
 
 /**
  * Editor component mapping (for future implementation)
@@ -163,7 +165,7 @@ export const DATATYPES = {
         key: 'langString',
         iri: ns.rdf('langString').value,
         node: ns.rdf('langString'),
-        label: 'Language-tagged String',
+        label: 'Lang-tagged string',
         description: 'Text with a language tag (e.g., "hello"@en)',
         category: 'core',
         editorType: 'lang-string',
@@ -206,17 +208,17 @@ export const DATATYPES = {
         pattern: /^[+-]?\d+(\.\d+)?$/,
     },
     
-    anyURI: {
-        key: 'anyURI',
-        iri: ns.xsd('anyURI').value,
-        node: ns.xsd('anyURI'),
-        label: 'URI (as literal)',
-        description: 'Absolute or relative URIs and IRIs',
+    resourceReference: {
+        key: 'resourceReference',
+        iri: 'urn:special:resourceReference', // Special marker, not a real datatype
+        node: ns.rdfs('Resource'), // Placeholder - this creates NamedNodes, not literals
+        label: 'Resource Reference',
+        description: 'Reference to another resource (IRI). Use for properties like rdfs:seeAlso',
         category: 'core',
-        editorType: 'iri-input',
-        examples: ['http://example.org/resource', 'urn:isbn:0451450523'],
+        editorType: 'resource-reference',
+        examples: ['http://example.org/resource', 'rxyz:Person'],
     },
-
+    
     // =========================================================================
     // Date & Time Types
     // =========================================================================
@@ -408,59 +410,6 @@ export function getDatatypesByCategory(): Array<{ category: DatatypeCategory; la
 }
 
 /******************************************************************************
- * RDF Literal Value Types
- * 
- * These types represent the value being edited before it becomes an RDF literal.
- * Use these in your editor components.
- *****************************************************************************/
-
-/** Value for a plain literal (most datatypes) */
-export interface LiteralValue {
-    kind: 'literal';
-    /** The lexical form (string representation) */
-    lexicalForm: string;
-    /** The datatype IRI */
-    datatypeIri: string;
-}
-
-/** Value for a language-tagged string */
-export interface LangStringValue {
-    kind: 'langString';
-    /** The text content */
-    lexicalForm: string;
-    /** BCP47 language tag */
-    languageTag: string;
-    /** Always rdf:langString */
-    datatypeIri: typeof DATATYPES.langString.iri;
-}
-
-/** Union type for all possible object values in a triple */
-export type ObjectValue = LiteralValue | LangStringValue ;
-
-/******************************************************************************
- * Factory Functions for Creating Values
- *****************************************************************************/
-
-/** Create a plain literal value */
-export function createLiteralValue(lexicalForm: string, datatypeKey: DatatypeKey): LiteralValue {
-    return {
-        kind: 'literal',
-        lexicalForm,
-        datatypeIri: DATATYPES[datatypeKey].iri,
-    };
-}
-
-/** Create a language-tagged string value */
-export function createLangStringValue(text: string, languageTag: string = DEFAULT_LANGUAGE_TAG): LangStringValue {
-    return {
-        kind: 'langString',
-        lexicalForm: text,
-        languageTag,
-        datatypeIri: DATATYPES.langString.iri,
-    };
-}
-
-/******************************************************************************
  * Validation Helpers
  *****************************************************************************/
 
@@ -496,60 +445,71 @@ export function isValidLanguageTag(tag: string): boolean {
 }
 
 /******************************************************************************
- * Example: How to use this in an editor component
+ * Property Datatype Hints
  * 
- * ```svelte
- * <script lang="ts">
- *   import { 
- *     DATATYPES, 
- *     LANGUAGE_TAGS, 
- *     type ObjectValue,
- *     createLiteralValue,
- *     createLangStringValue,
- *     createIriReferenceValue,
- *     getDatatypeByKey,
- *   } from '$lib/rdf/datatypes';
- *   
- *   let selectedDatatype = $state<DatatypeKey>('string');
- *   let lexicalForm = $state('');
- *   let languageTag = $state('en');
- *   
- *   // Get editor type for selected datatype
- *   const editorType = $derived(getDatatypeByKey(selectedDatatype).editorType);
- *   
- *   // Build the final value
- *   function getValue(): ObjectValue {
- *     if (selectedDatatype === 'langString') {
- *       return createLangStringValue(lexicalForm, languageTag);
- *     }
- *     return createLiteralValue(lexicalForm, selectedDatatype);
- *   }
- * </script>
- * 
- * <!-- Datatype selector -->
- * <Select bind:value={selectedDatatype}>
- *   {#each Object.entries(DATATYPES) as [key, dt]}
- *     <SelectItem value={key}>{dt.label}</SelectItem>
- *   {/each}
- * </Select>
- * 
- * <!-- Dynamic editor based on editorType -->
- * {#if editorType === 'text-input'}
- *   <Input bind:value={lexicalForm} />
- * {:else if editorType === 'lang-string'}
- *   <Input bind:value={lexicalForm} />
- *   <Select bind:value={languageTag}>
- *     {#each LANGUAGE_TAGS as lang}
- *       <SelectItem value={lang.tag}>{lang.label}</SelectItem>
- *     {/each}
- *   </Select>
- * {:else if editorType === 'integer-input'}
- *   <NumberField bind:value={lexicalForm} />
- * {:else if editorType === 'checkbox'}
- *   <Checkbox checked={lexicalForm === 'true'} 
- *     onCheckedChange={(v) => lexicalForm = v ? 'true' : 'false'} />
- * {:else if editorType === 'date-picker'}
- *   <DatePicker bind:value={lexicalForm} />
- * {/if}
- * ```
+ * Suggests appropriate datatypes for annotation properties based on:
+ * 1. Direct property IRI mapping
+ * 2. Parent properties via rdfs:subPropertyOf (inherited hints)
  *****************************************************************************/
+
+import type { RdfStore } from '$lib/stores/rdf.svelte';
+
+/**
+ * Static mapping from property IRIs to suggested datatypes.
+ * These are well-known annotation properties with expected value types.
+ */
+export const PROPERTY_DATATYPE_HINTS: Record<string, DatatypeKey> = {
+    [ns.rdfs('label').value]: 'langString',
+    [ns.rdfs('comment').value]: 'langString',
+    [ns.skos('note').value]: 'langString',
+    [ns.rdfs('seeAlso').value]: 'resourceReference',
+};
+
+/**
+ * Get suggested datatype for a property, checking parent properties via rdfs:subPropertyOf.
+ * 
+ * The lookup strategy:
+ * 1. Check if property IRI is directly in PROPERTY_DATATYPE_HINTS
+ * 2. If not found, check parent properties recursively
+ * 3. Return undefined if no hint found
+ * 
+ * @param store - The RDF store to query for parent properties
+ * @param propertyIri - The property IRI to get hint for
+ * @param maxDepth - Maximum recursion depth (prevents infinite loops)
+ * @returns Suggested datatype key or undefined
+ */
+export function getSuggestedDatatype(
+    store: RdfStore,
+    propertyIri: string | NamedNode,
+    maxDepth: number = 5
+): DatatypeKey | undefined {
+    const iri = typeof propertyIri === 'string' ? propertyIri : propertyIri.value;
+    
+    // Check direct mapping first
+    if (PROPERTY_DATATYPE_HINTS[iri]) {
+        return PROPERTY_DATATYPE_HINTS[iri];
+    }
+    
+    // Base case: max depth reached
+    if (maxDepth <= 0) {
+        return undefined;
+    }
+    
+    // Check parent properties via rdfs:subPropertyOf
+    const parentQuads = store.getQuads(
+        ns.fromIri(iri),
+        ns.rdfs('subPropertyOf'),
+        null
+    );
+    
+    for (const quad of parentQuads) {
+        if (quad.object.termType === 'NamedNode') {
+            const parentHint = getSuggestedDatatype(store, quad.object.value, maxDepth - 1);
+            if (parentHint) {
+                return parentHint;
+            }
+        }
+    }
+    
+    return undefined;
+}
