@@ -56,3 +56,5 @@
         <p class="text-muted-foreground">Select a resource to view details</p>
     </div>
 {/if}
+
+

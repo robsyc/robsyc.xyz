@@ -242,3 +242,5 @@ export function removeResourceRecursive(
         store.removeQuad(quad);
     }
 }
+
+

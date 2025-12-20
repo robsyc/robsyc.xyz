@@ -34,15 +34,6 @@
     
     const TABS: TabConfig[] = [
         {
-            id: 'classes',
-            label: 'Classes',
-            resourceType: ns.rdfs('Class'),
-            hierarchyPredicate: ns.rdfs('subClassOf'),
-            typeBadge: 'rdfs:Class',
-            typeLabel: 'Class',
-            emptyLabel: 'No classes found'
-        },
-        {
             id: 'properties',
             label: 'Annotation Properties',
             resourceType: ns.owl('AnnotationProperty'),
@@ -50,7 +41,17 @@
             typeBadge: 'owl:AnnotationProperty',
             typeLabel: 'Property',
             emptyLabel: 'No annotation properties found'
+        },
+        {
+            id: 'classes',
+            label: 'Classes',
+            resourceType: ns.rdfs('Class'),
+            hierarchyPredicate: ns.rdfs('subClassOf'),
+            typeBadge: 'rdfs:Class',
+            typeLabel: 'Class',
+            emptyLabel: 'No classes found'
         }
+        // TODO: sh:NodeShape, named sh:PropertyShape, owl:Class, owl:ObjectProperty, owl:DatatypeProperty
     ];
 
     // Active tab state
@@ -330,3 +331,5 @@
     typeLabel={currentTabConfig.typeLabel}
     oncreate={handleResourceCreated}
 />
+
+

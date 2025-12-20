@@ -61,6 +61,3 @@ export function getLocalName(iri: string): string {
     const separatorIndex = Math.max(hashIndex, slashIndex);
     return separatorIndex >= 0 ? iri.substring(separatorIndex + 1) : iri;
 }
-
-/** Common language tags for UI */
-export const commonLanguageTags = ['en', 'nl', 'de', 'fr', 'es'];

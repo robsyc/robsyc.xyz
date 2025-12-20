@@ -104,3 +104,5 @@ export function expectsIriReference(
 ): boolean {
     return getSuggestedDatatype(store, propertyIri) === 'anyURI';
 }
+
+

@@ -34,24 +34,6 @@ The right panel is a **multi-section container**. Different resource types get d
 
 A generic tree browser for any RDF type hierarchy.
 
-**Props:**
-```typescript
-interface HierarchyTreeProps {
-  /** The rdf:type to browse (e.g., ns.rdfs('Class')) */
-  resourceType: NamedNode;
-  /** Property that defines parent-child (e.g., rdfs:subClassOf) */
-  hierarchyPredicate: NamedNode;
-  /** Currently selected resource (bindable) */
-  selected?: NamedNode | null;
-  /** Callback when selection changes */
-  onselect?: (node: NamedNode | null) => void;
-  /** Optional: custom node rendering */
-  nodeContent?: Snippet<[{ node: NamedNode; label: string; depth: number }]>;
-  /** Label for empty state (e.g., "No classes found") */
-  emptyLabel?: string;
-}
-```
-
 **Features:**
 - Combobox search by `rdfs:label` or local name w/ deduplication
 - Type badge (e.g., "a rdfs:Class")
@@ -63,28 +45,6 @@ interface HierarchyTreeProps {
 - Visual indication of expandable nodes (has children)
 - **Snippet prop** for custom node rendering
 
-**Usage:**
-```svelte
-<!-- Works for ANY hierarchical RDF type -->
-<HierarchyTree 
-  resourceType={ns.rdfs('Class')} 
-  hierarchyPredicate={ns.rdfs('subClassOf')}
-  bind:selected={selectedClass}
-/>
-
-<HierarchyTree 
-  resourceType={ns.owl('AnnotationProperty')} 
-  hierarchyPredicate={ns.rdfs('subPropertyOf')}
-  bind:selected={selectedProperty}
-/>
-
-<HierarchyTree 
-  resourceType={ns.sh('NodeShape')} 
-  hierarchyPredicate={ns.sh('node')}  <!-- or custom -->
-  bind:selected={selectedShape}
-/>
-```
-
 **Base shadcn Components:** `Combobox`, `Button`, `Tree` (shadcn-extras), `ScrollArea`
 
 ---
@@ -92,29 +52,6 @@ interface HierarchyTreeProps {
 ### 2. ResourceDetailPanel (Multi-Section Container)
 
 A container that displays multiple collapsible sections for the selected resource.
-
-**Props:**
-```typescript
-interface ResourceDetailPanelProps {
-  /** The resource to display */
-  subject: NamedNode | null;
-  /** Sections to render (via snippets or children) */
-  children: Snippet;
-}
-```
-
-**Usage:**
-```svelte
-<ResourceDetailPanel subject={selectedClass}>
-  <!-- Sections are composed based on resource type -->
-  <AnnotationSection {subject} />
-  <HierarchySection 
-    {subject} 
-    predicate={ns.rdfs('subClassOf')}
-    label="Superclasses"
-  />
-</ResourceDetailPanel>
-```
 
 This allows different views to compose different sections:
 - `ClassEditorView`: Annotations + Superclass hierarchy
@@ -127,84 +64,24 @@ This allows different views to compose different sections:
 
 Displays and edits annotations for **any** resource. This is the key reusable piece.
 
-**Props:**
-```typescript
-interface AnnotationSectionProps {
-  /** The resource being annotated */
-  subject: NamedNode;
-  /** Section title (default: "Annotations") */
-  title?: string;
-  /** Initially collapsed? */
-  collapsed?: boolean;
-}
-```
-
 **Key Insight:** This component works for:
 - Annotating an `rdfs:Class` (e.g., `rxyz:Person rdfs:label "Person"@en`)
 - Annotating an `owl:AnnotationProperty` (e.g., `rdfs:label rdfs:label "label"`) ← meta!
 - Annotating a `sh:NodeShape`, `owl:Class`, etc.
 
 **Features:**
-- Collapsible section with "owl:AnnotationProperty" heading
+- Collapsible section with "Annotations" heading
 - Bulk actions: remove selected, add new
 - **Grouped by property**: Multiple values for same predicate grouped
 - Collapse/expand groups with multiple values
 - Per-value actions: edit, delete
 - "Add value" button per property group
 
-**Data Structure:**
-```typescript
-interface AnnotationGroup {
-  predicate: NamedNode;
-  label: string;
-  values: AnnotationValue[];
-  isExpanded: boolean;
-}
-
-interface AnnotationValue {
-  quad: Quad;
-  displayValue: string;  // "Person@en" or "true"
-  isSelected: boolean;
-}
-```
-
 ---
 
 ### 4. HierarchySection (Reusable for Relations)
 
 Displays hierarchical relationships (subClassOf, subPropertyOf, etc.)
-
-**Props:**
-```typescript
-interface HierarchySectionProps {
-  subject: NamedNode;
-  /** The predicate defining the hierarchy (rdfs:subClassOf, rdfs:subPropertyOf) */
-  predicate: NamedNode;
-  /** Section label */
-  label: string;
-  /** Direction: subject -> object or object -> subject */
-  direction?: 'outgoing' | 'incoming';
-}
-```
-
-**Usage:**
-```svelte
-<!-- For rdfs:Class: show superclasses -->
-<HierarchySection 
-  {subject} 
-  predicate={ns.rdfs('subClassOf')} 
-  label="Superclasses"
-  direction="outgoing"
-/>
-
-<!-- For rdfs:Class: show subclasses -->
-<HierarchySection 
-  {subject} 
-  predicate={ns.rdfs('subClassOf')} 
-  label="Subclasses"
-  direction="incoming"
-/>
-```
 
 ---
 
@@ -237,17 +114,6 @@ A dialog for creating/editing literal values with full datatype support.
 └────────────────────────────┴────────────────┴───────────────────────────────────┘
 ```
 
-**Props:**
-```typescript
-interface LiteralEditorDialogProps {
-  subject: NamedNode;
-  predicate?: NamedNode;        // Pre-selected (for editing)
-  existingValue?: ObjectValue;  // For edit mode
-  onsubmit: (predicate: NamedNode, value: ObjectValue) => void;
-  oncancel: () => void;
-}
-```
-
 **Three Sections:**
 1. **PropertyTree** (left): Reuse `HierarchyTree` for `owl:AnnotationProperty`
 2. **DatatypeSelector** (middle): Vertical list from `DATATYPES` (grouped by category)
@@ -258,16 +124,6 @@ interface LiteralEditorDialogProps {
 ### 6. LiteralValueEditor (Dynamic Input)
 
 Renders the appropriate input based on `editorType`.
-
-**Props:**
-```typescript
-interface LiteralValueEditorProps {
-  datatypeKey: DatatypeKey;
-  value: ObjectValue;
-  onchange: (value: ObjectValue) => void;
-  error?: string;
-}
-```
 
 **Editor Mapping (from `datatypes.ts`):**
 
@@ -284,155 +140,6 @@ interface LiteralValueEditorProps {
 
 ---
 
-## View Composition Examples
-
-### ClassEditorView.svelte
-
-```svelte
-<script lang="ts">
-  import { HierarchyTree, ResourceDetailPanel, AnnotationSection, HierarchySection } from '$lib/components/rdf';
-  import { ns } from '$lib/rdf/namespaces';
-  
-  let selected = $state<NamedNode | null>(null);
-</script>
-
-<div class="grid grid-cols-2 gap-4">
-  <!-- Left: Class hierarchy browser -->
-  <HierarchyTree
-    resourceType={ns.rdfs('Class')}
-    hierarchyPredicate={ns.rdfs('subClassOf')}
-    bind:selected
-  />
-  
-  <!-- Right: Detail panel with sections -->
-  {#if selected}
-    <ResourceDetailPanel subject={selected}>
-      <AnnotationSection subject={selected} />
-      <HierarchySection 
-        subject={selected}
-        predicate={ns.rdfs('subClassOf')}
-        label="Superclasses"
-      />
-    </ResourceDetailPanel>
-  {/if}
-</div>
-```
-
-### PropertyEditorView.svelte
-
-```svelte
-<script lang="ts">
-  import { HierarchyTree, ResourceDetailPanel, AnnotationSection, HierarchySection } from '$lib/components/rdf';
-  import { ns } from '$lib/rdf/namespaces';
-  
-  let selected = $state<NamedNode | null>(null);
-</script>
-
-<div class="grid grid-cols-2 gap-4">
-  <!-- Left: Annotation property hierarchy -->
-  <HierarchyTree
-    resourceType={ns.owl('AnnotationProperty')}
-    hierarchyPredicate={ns.rdfs('subPropertyOf')}
-    bind:selected
-  />
-  
-  <!-- Right: Same components, different context! -->
-  {#if selected}
-    <ResourceDetailPanel subject={selected}>
-      <!-- rdfs:label itself has an rdfs:label "label" - meta! -->
-      <AnnotationSection subject={selected} />
-      <HierarchySection 
-        subject={selected}
-        predicate={ns.rdfs('subPropertyOf')}
-        label="Parent Properties"
-      />
-    </ResourceDetailPanel>
-  {/if}
-</div>
-```
-
----
-
-## Context for Shared State
-
-Use Svelte context to avoid prop drilling:
-
-```typescript
-// $lib/components/rdf/context.ts
-import { createContext } from 'svelte';
-import type { RdfStore } from '$lib/stores/rdf.svelte';
-import type { NamedNode } from 'n3';
-
-export interface RdfEditorContext {
-  store: RdfStore;
-  selectedResource: NamedNode | null;
-}
-
-export const [getRdfContext, setRdfContext] = createContext<RdfEditorContext>();
-```
-
-```svelte
-<!-- In parent view -->
-<script>
-  import { setRdfContext } from './context';
-  import { rdfStore } from '$lib/stores/rdf.svelte';
-  
-  let selected = $state<NamedNode | null>(null);
-  
-  setRdfContext({
-    store: rdfStore,
-    get selectedResource() { return selected; }
-  });
-</script>
-```
-
-```svelte
-<!-- In child component (no prop drilling!) -->
-<script>
-  import { getRdfContext } from './context';
-  
-  const ctx = getRdfContext();
-  // Access ctx.store and ctx.selectedResource
-</script>
-```
-
----
-
-## Datatype Hints (Property → Suggested Datatype)
-
-Hints are inherited via `rdfs:subPropertyOf`:
-
-```typescript
-// $lib/rdf/datatype-hints.ts
-export const PROPERTY_DATATYPE_HINTS: Record<string, DatatypeKey> = {
-  [ns.rdfs('label').value]: 'langString',
-  [ns.rdfs('comment').value]: 'langString',
-  [ns.rdfs('seeAlso').value]: 'anyURI',
-  [ns.skos('note').value]: 'langString',
-};
-
-/** Get suggested datatype, checking parent properties */
-export function getSuggestedDatatype(
-  propertyIri: string,
-  store: RdfStore
-): DatatypeKey | undefined {
-  if (PROPERTY_DATATYPE_HINTS[propertyIri]) {
-    return PROPERTY_DATATYPE_HINTS[propertyIri];
-  }
-  
-  // Check parent via rdfs:subPropertyOf (recursive)
-  const parents = store.getQuads(ns.fromIri(propertyIri), ns.rdfs('subPropertyOf'), null);
-  for (const quad of parents) {
-    const hint = getSuggestedDatatype(quad.object.value, store);
-    if (hint) return hint;
-  }
-  
-  return undefined;
-}
-```
-
----
-
 ## File Structure
 
 ```
@@ -445,16 +152,18 @@ src/lib/components/rdf/
 │   └── index.ts
 ├── sections/
 │   ├── AnnotationSection.svelte   # Annotation editor section
-│   ├── HierarchySection.svelte    # Hierarchy display section (future)
+│   ├── HierarchySection.svelte    # Hierarchy display section
 │   ├── PropertyShapeSection.svelte # For sh:NodeShape (future)
 │   └── index.ts
 ├── editors/
+│   ├── CreateResourceDialog.svelte # Create a new resource (e.g., Class or Property)
 │   ├── LiteralEditorDialog.svelte # Full add/edit dialog
 │   ├── LiteralValueEditor.svelte  # Dynamic input dispatcher
 │   ├── DatatypeSelector.svelte    # Datatype picker
 │   ├── DatatypeInfoPanel.svelte   # Datatype description
 │   ├── LanguageSelector.svelte    # BCP47 selector
 │   ├── LangStringEditor.svelte    # Text + language
+│   ├── more datatype-specific editor components...
 │   └── index.ts
 ├── panels/
 │   ├── ResourceDetailPanel.svelte # Multi-section container (which sections are used is determined by the resource type)

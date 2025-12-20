@@ -27,3 +27,5 @@ export function setRdfContext(context: RdfEditorContext): void {
 export function getRdfContext(): RdfEditorContext {
     return getContext<RdfEditorContext>(RDF_CONTEXT_KEY);
 }
+
+
