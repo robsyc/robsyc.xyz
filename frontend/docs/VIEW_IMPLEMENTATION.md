@@ -289,13 +289,30 @@ src/lib/
 
 ## Next Sprint: Integration Tasks
 
-- Simplify component props by ragarding URI as ID and determining label (CURIE) from it
-- Wire Multi-Selection into UI for batch editing operations (for now just delete)
+- Wire Multi-Selection into UI for batch editing operations (for now just "Delete selected")
 - Replace Dialog State Variables using createDialogState utility to reduce boilerplate
 - Dynamic Section Composition with getSectionsForResource utility
-- Add Drag-and-Drop to HierarchyTree (using svelte-dnd-action and `ondrop` callback for hierarchy modifications)
+- Add Drag-and-Drop to HierarchyTree (using `svelte-dnd-action` for hierarchy modifications)
+- Implement SHACL NodeShape and PropertyShape integration with new tabs, starting with `02-simple-shacl.ttl`
+
+### Lower Priority
+
+- Back and forward navigation, Ctrl+Z/Y for undo/redo and improved keyboard-only UX
 - Tree Virtualization for Large Graphs (using `@tanstack/svelte-virtual`)
 - Additional Datatype Editors (e.g., date picker for `xsd:date`, `xsd:dateTime`, number spinner with constraints for `xsd:integer`, duration editor for `xsd:duration`, etc.)
+- Simplify component props by ragarding URI as ID and determining label (CURIE) from it
+
+### Down the road
+
+- Set up testing infrastructure
+- More complex SHACL shapes and predicate paths, nested PropertyShapes, sh:node, etc.
+- Sidebar for dashboard with graphs overview & statistics, search panel, AI panel, ...
+- OWL Class integration (with restrictions, equivalence, disjoint, etc.)
+- OWL Datatype and ObjectProperty integration (with characteristics, subproperty chains) are used in PropertyShape sh:path
+- Creation of instance data with SHACL validation
+- OWL inference support (RDFS, RDFS-plus, OWL-RL, custom N3 rules)
+- Pick back up on FLOW implementation (should be easier now that we have clearer API and reusable components)
+- Re-integrate with FastAPI backend and dedicated triple store for AI workflows, user management, long-term storage, ...
 
 ---
 

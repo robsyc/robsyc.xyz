@@ -12,33 +12,33 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
-		"@internationalized/date": "^3.10.0",
+		"@internationalized/date": "^3.10.1",
 		"@lucide/svelte": "^0.554.0",
 		"@sveltejs/adapter-auto": "^6.1.1",
-		"@sveltejs/kit": "^2.49.1",
+		"@sveltejs/kit": "^2.49.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
-		"@tailwindcss/vite": "^4.1.17",
+		"@tailwindcss/vite": "^4.1.18",
+		"@types/n3": "^1.26.1",
 		"@types/clownface": "^2.0.10",
+		"@types/rdf-validate-shacl": "^0.5.7",
 		"bits-ui": "^2.14.4",
 		"clsx": "^2.1.1",
 		"runed": "^0.36.0",
-		"svelte": "^5.45.6",
-		"svelte-check": "^4.3.4",
+		"svelte": "^5.46.0",
+		"svelte-check": "^4.3.5",
 		"svelte-toolbelt": "^0.10.6",
 		"tailwind-merge": "^3.4.0",
 		"tailwind-variants": "^3.2.2",
-		"tailwindcss": "^4.1.17",
+		"tailwindcss": "^4.1.18",
 		"tw-animate-css": "^1.4.0",
 		"typescript": "^5.9.3",
-		"vite": "^7.2.6"
+		"vite": "^7.3.0"
 	},
 	"dependencies": {
 		"@rdfjs/data-model": "^2.1.1",
 		"@rdfjs/dataset": "^2.0.2",
 		"@rdfjs/environment": "^1.0.0",
 		"@rdfjs/namespace": "^2.0.1",
-		"@types/n3": "^1.26.1",
-		"@types/rdf-validate-shacl": "^0.5.7",
 		"@xyflow/svelte": "^1.5.0",
 		"clownface": "^2.0.3",
 		"clownface-shacl-path": "^2.4.0",
@@ -46,6 +46,7 @@
 		"marked": "^16.4.2",
 		"mode-watcher": "^1.1.0",
 		"n3": "^1.26.0",
-		"rdf-validate-shacl": "^0.6.5"
+		"rdf-validate-shacl": "^0.6.5",
+		"svelte-dnd-action": "^0.9.68"
 	}
 }
