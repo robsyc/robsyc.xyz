@@ -38,6 +38,8 @@ export type ViewProfileId =
 /**
  * Check if a ViewProfileId corresponds to a ResourceTypeId.
  * Useful for converting between the two type systems.
+ * 
+ * NOTE: Currently unused - kept for future type-narrowing use cases.
  */
 export function isResourceTypeId(id: ViewProfileId): id is ViewProfileId & ResourceTypeId {
 	return id !== 'shapeClass' && id !== 'unknown';
@@ -68,22 +70,34 @@ export interface SectionConfig {
 }
 
 /**
- * Get the sections to display for a resource based on its types.
+ * Get the sections to display for a resource based on its types AND the active tab.
  * This centralizes the logic for determining which UI sections to show.
+ * 
+ * When a resource has multiple types (e.g., rdfs:Class + sh:NodeShape), the sections
+ * shown depend on which tab is currently active:
+ * - Classes tab: show class-related sections (Annotations, Hierarchy with rdfs:subClassOf)
+ * - Node Shapes tab: show SHACL sections (Annotations, Targets, PropertyShapes, Hierarchy with sh:node)
  * 
  * @param store - The RDF store
  * @param resource - The resource to get sections for
+ * @param activeTab - The currently active tab (determines which sections to show)
  * @returns Array of section configurations in display order
  */
 export function getSectionsForResource(
 	store: RdfStore,
-	resource: NamedNode | BlankNode
+	resource: NamedNode | BlankNode,
+	activeTab?: ResourceTypeId
 ): SectionConfig[] {
 	store.version; // reactive
 
 	const sections: SectionConfig[] = [];
 	const profile = getViewProfile(store, resource);
-	const hierarchyPredicates = getHierarchyPredicatesForResource(store, resource);
+	
+	// Determine effective view mode based on active tab
+	// If the resource is a ShapeClass (dual type), use the active tab to determine sections
+	const effectiveProfile: ViewProfileId = (profile.id === 'shapeClass' && activeTab)
+		? (activeTab as ViewProfileId)  // Use tab to determine view (safe cast: ResourceTypeId subset of ViewProfileId)
+		: profile.id;
 
 	// 1. Annotations section - always present for any resource
 	sections.push({
@@ -91,8 +105,8 @@ export function getSectionsForResource(
 		props: {}
 	});
 
-	// 2. Target section - for NodeShapes and ShapeClasses
-	if (profile.id === 'nodeShape' || profile.id === 'shapeClass') {
+	// 2. Target section - only for NodeShape view (not when viewing as Class)
+	if (effectiveProfile === 'nodeShape') {
 		if (hasTargets(store, resource)) {
 			sections.push({
 				type: 'target',
@@ -101,19 +115,22 @@ export function getSectionsForResource(
 		}
 	}
 
-	// 3. Hierarchy section - if the resource has hierarchy predicates
-	if (hierarchyPredicates.length > 0) {
+	// 3. Hierarchy section - filtered by effective profile
+	const hierarchyPredicates = getHierarchyPredicatesForResource(store, resource);
+	const filteredPredicates = filterHierarchyPredicates(hierarchyPredicates, effectiveProfile);
+	
+	if (filteredPredicates.length > 0) {
 		sections.push({
 			type: 'hierarchy',
-			title: getHierarchySectionTitle(profile.id),
+			title: getHierarchySectionTitle(effectiveProfile),
 			props: {
-				predicates: hierarchyPredicates
+				predicates: filteredPredicates
 			}
 		});
 	}
 
-	// 4. PropertyShapes section - for NodeShapes and ShapeClasses
-	if (profile.id === 'nodeShape' || profile.id === 'shapeClass') {
+	// 4. PropertyShapes section - only for NodeShape view (not when viewing as Class)
+	if (effectiveProfile === 'nodeShape') {
 		if (hasPropertyShapes(store, resource)) {
 			sections.push({
 				type: 'propertyShapes',
@@ -123,6 +140,26 @@ export function getSectionsForResource(
 	}
 
 	return sections;
+}
+
+/**
+ * Filter hierarchy predicates based on the effective view profile.
+ * - For class view: only show rdfs:subClassOf
+ * - For nodeShape view: only show sh:node
+ * - For others: show all
+ */
+function filterHierarchyPredicates(
+	predicates: NamedNode[],
+	effectiveProfile: ViewProfileId
+): NamedNode[] {
+	if (effectiveProfile === 'class') {
+		return predicates.filter(p => p.value === ns.rdfs('subClassOf').value);
+	}
+	if (effectiveProfile === 'nodeShape') {
+		return predicates.filter(p => p.value === ns.sh('node').value);
+	}
+	// For shapeClass or unknown, show all predicates
+	return predicates;
 }
 
 /**

@@ -25,7 +25,7 @@
     }
 
     let {
-        open = $bindable(false),
+        open = false,
         resourceType,
         parent = null,
         hierarchyPredicate,
@@ -86,16 +86,15 @@
         );
 
         oncreate?.(newResource);
-        open = false;
+        onclose?.();
     }
 
     function handleClose() {
         onclose?.();
-        open = false;
     }
 </script>
 
-<Dialog.Root bind:open onOpenChange={(o) => !o && handleClose()}>
+<Dialog.Root {open} onOpenChange={(o) => !o && handleClose()}>
     <Dialog.Content class="max-w-md">
         <Dialog.Header>
             <Dialog.Title>

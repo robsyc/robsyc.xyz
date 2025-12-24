@@ -42,9 +42,15 @@ export interface ResourceTypeConfig {
  * Resource Type Registry
  * 
  * Defines all supported resource types. Add new types here to extend the app.
+ * 
+ * Status:
+ * - ACTIVE: Shown as tabs in /view, fully supported
+ * - DETECTION: Used for type detection but not shown as tabs
+ * - FUTURE: Planned, not yet integrated into UI
  *****************************************************************************/
 
 export const RESOURCE_TYPES: Record<string, ResourceTypeConfig> = {
+    // ACTIVE - Shown as tabs in /view
     annotationProperty: {
         id: 'annotationProperty',
         label: 'Annotation Property',
@@ -67,7 +73,6 @@ export const RESOURCE_TYPES: Record<string, ResourceTypeConfig> = {
         order: 1,
     },
     
-    // Future: sh:NodeShape
     nodeShape: {
         id: 'nodeShape',
         label: 'Node Shape',
@@ -79,6 +84,7 @@ export const RESOURCE_TYPES: Record<string, ResourceTypeConfig> = {
         order: 2,
     },
 
+    // DETECTION - Used for type detection and view profiles, not shown as tabs
     propertyShape: {
         id: 'propertyShape',
         label: 'Property Shape',
@@ -90,7 +96,7 @@ export const RESOURCE_TYPES: Record<string, ResourceTypeConfig> = {
         order: 3,
     },
     
-    // Future: owl:Class (distinct from rdfs:Class for OWL-specific features)
+    // FUTURE - Not yet integrated into UI
     owlClass: {
         id: 'owlClass',
         label: 'OWL Class',
@@ -102,7 +108,6 @@ export const RESOURCE_TYPES: Record<string, ResourceTypeConfig> = {
         order: 4,
     },
     
-    // Future: owl:DatatypeProperty
     datatypeProperty: {
         id: 'datatypeProperty',
         label: 'Datatype Property',
@@ -114,7 +119,6 @@ export const RESOURCE_TYPES: Record<string, ResourceTypeConfig> = {
         order: 5,
     },
 
-    // Future: owl:ObjectProperty
     objectProperty: {
         id: 'objectProperty',
         label: 'Object Property',
@@ -247,7 +251,7 @@ export function findResourceTypeByTypeIri(
 
 /**
  * Get the subset of resource types to show as tabs.
- * Currently returns annotation properties and classes.
+ * Returns annotation properties, classes, and node shapes.
  */
 export function getViewableResourceTypes(): ResourceTypeConfig[] {
     // For now, only show these types in the view
@@ -255,5 +259,6 @@ export function getViewableResourceTypes(): ResourceTypeConfig[] {
     return [
         RESOURCE_TYPES.annotationProperty,
         RESOURCE_TYPES.class,
+        RESOURCE_TYPES.nodeShape,
     ];
 }

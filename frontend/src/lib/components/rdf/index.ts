@@ -5,7 +5,14 @@
  */
 
 // Context
-export { getRdfContext, setRdfContext, createRdfContext, type RdfEditorContext } from './context';
+export { 
+    getRdfContext, 
+    setRdfContext, 
+    createRdfContext, 
+    type RdfEditorContext,
+    type NavigationCallbacks,
+    type CreateRdfContextOptions
+} from './context';
 
 // Shared components
 export { IriTooltip, ResourceSelector } from './shared';

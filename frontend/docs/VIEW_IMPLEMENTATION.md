@@ -2,46 +2,67 @@
 
 ## Goal
 
-Build a shadcn-based UI for browsing and editing RDF resources. The UI follows a **two-panel pattern**: a reusable hierarchy browser on the left, and a detail viewer/editor on the right. This enables creating and editing RDF data like `01-basic-classes.ttl`.
+Build a shadcn-based UI for browsing and editing RDF resources. The UI follows a **two-panel pattern**: a reusable hierarchy browser on the left, and a detail viewer/editor on the right. This enables creating and editing RDF data like `01-basic-classes.ttl` and `02-simple-shacl.ttl`
 
 ---
 
 ## Current Status
 
 ### Implemented ✅
-- **HierarchyTree**: Generic tree browser with debounced search, expand/collapse, CRUD actions
-- **ResourceDetailPanel**: Multi-section container with header showing label/IRI
-- **AnnotationSection**: View and edit annotations grouped by predicate
-- **HierarchySection**: View and edit hierarchical relationships (supports multiple predicates for ShapeClass)
-- **TargetSection**: Display SHACL targeting (sh:targetClass, etc.) NEW
-- **PropertyShapeSection**: Display sh:PropertyShape details for NodeShapes NEW
-- **LiteralEditorDialog**: Three-panel dialog for creating/editing literals with datatype support
-- **CreateResourceDialog**: Dialog for creating new resources with namespace selection
-- **HierarchyEditorDialog**: Dialog for adding/editing hierarchy relationships with cycle detection
+
+**Core Components:**
+- **HierarchyTree**: Tree browser with search, expand/collapse, CRUD, multi-select support
+- **ResourceDetailPanel**: Multi-section container with header for currently selected resource
+- **AnnotationSection**: View/edit annotations grouped by predicate
+- **HierarchySection**: View/edit hierarchical relationships
+- **TargetSection**: Display SHACL targeting (currently lacks a hint for implicit class targets)
+- **PropertyShapeSection**: Display sh:PropertyShape details (currently cannot be edited and isn't removed when deleting the node shape)
+
+**Dialogs:**
+- **LiteralEditorDialog**: Create/edit literals with datatype support (more work needed for datatype oriented field components e.g., xsd:date)
+- **CreateResourceDialog**: Create new resources with namespace selection and optionally a parent resource to link to
+- **HierarchyEditorDialog**: Add/edit hierarchy relationships with cycle detection
+
+**Infrastructure:**
 - **RdfStore**: Reactive N3.js wrapper with batch transactions
-- **Resource type configuration**: `resource-types.ts` with extensible type registry
-- **View profiles**: `view-profiles.ts` with section composition logic NEW
-- **Reactive utilities**: `createExpandableSet`, `createDebounced`, `createSelectionState`, `createDialogState` NEW
+- **Resource type config**: `resource-types.ts` with extensible type registry
+- **View profiles**: `view-profiles.ts` with tab-aware section composition
+- **Selection state**: `selection.svelte.ts` with per-tab multi-select support
+- **Utilities**: e.g., `dialog.svelte.ts` for dialogs, `expandable.svelte.ts` for expandable sets, `debounce.svelte.ts` for debounced functions, etc.
 
-### Ready for Integration 🔧
-These utilities were created during the refactoring sprint but are **not yet wired into production code**:
+### Selection Model ✅
 
-| Utility | File | Purpose | Integration Point |
-|---------|------|---------|-------------------|
-| `createSelectionState()` | `$lib/utils/selection.svelte.ts` | Single/multi-selection with shift-click | Replace manual selection in `+page.svelte` |
-| `createKeyedSelectionState()` | `$lib/utils/selection.svelte.ts` | Per-tab selection tracking | Replace `selectedByTab` record |
-| `createRdfContext()` | `$lib/components/rdf/context.ts` | Context factory with multi-selection | Replace manual context creation |
-| `createDialogState()` | `$lib/utils/dialog.svelte.ts` | Generic dialog open/data management | Replace 8+ dialog state variables |
-| `createConfirmDialog()` | `$lib/utils/dialog.svelte.ts` | Confirmation dialog with action | Replace confirm dialog boilerplate |
-| `getSectionsForResource()` | `$lib/rdf/view-profiles.ts` | Dynamic section composition | Replace manual section conditionals |
+Per-tab selection with multi-select support:
+
+```typescript
+// Per-tab selection (in +page.svelte)
+const selections = createKeyedSelectionState(TABS.map(t => t.id));
+const activeSelection = $derived(selections.get(activeTab));
+
+// Single click: select and update detail panel
+activeSelection.select(resource);
+
+// Shift+click: toggle multi-select (highlighting only, no panel update)
+activeSelection.toggle(resource, true);
+
+// Check if selected (for highlighting)
+activeSelection.isSelected(resource);
+
+// Batch operations use activeSelection.count and getSelectedIris()
+```
+
+Key behaviors:
+- **Click**: Selects resource, updates detail panel, clears multi-selection
+- **Shift+click**: Toggles resource in selection set, highlights but doesn't change detail panel
+- **Tab switch**: Each tab maintains its own selection (including multi-select)
+- **Remove button**: Deletes all selected when count > 1, single resource otherwise (in the future we will add more batch operations e.g., copy all labels with indentation)
 
 ### Planned 📋
-- **Drag-and-drop** hierarchy manipulation in tree (using svelte-dnd-action)
-- **Multi-select** with shift-click (utility ready, needs UI wiring + testing)
-- **Dynamic section composition** (utility ready, needs UI wiring + testing)
-- **SHACL NodeShape and PropertyShape integration** new tabs for working with SHACL shapes (`02-simple-shacl.ttl`)
-- **Tree virtualization** for large graphs (consider @tanstack/svelte-virtual)
-- More datatype-specific editors (date pickers, etc.)
+
+- **Drag-and-drop** hierarchy manipulation (using svelte-dnd-action)
+- **Tree virtualization** for large graphs (@tanstack/svelte-virtual)
+- **Datatype-specific editors** (date pickers, etc.)
+- **SHACL PropertyShape editor** (complex: constraints, nesting)
 - Further consolidate UI with generic base components & deduplicate
 
 ---
@@ -81,156 +102,75 @@ Use `getSectionsForResource()` to dynamically determine which sections to show.
 
 ## Architecture
 
-### Type System
+### Selection Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     ResourceTypeId                              │
-│  (RDF-based: 'class', 'nodeShape', 'annotationProperty', etc.)  │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ maps to
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      ViewProfileId                              │
-│  ResourceTypeId + UI-only: 'shapeClass', 'unknown'              │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ determines
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      SectionConfig[]                            │
-│  Which sections to show: annotation, hierarchy, target, etc.    │
+│                    +page.svelte                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ createKeyedSelectionState(tabs)                          │   │
+│  │   → selections.get(activeTab) → activeSelection          │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                            │                                    │
+│      ┌─────────────────────┼─────────────────────┐              │
+│      ▼                     ▼                     ▼              │
+│  ┌────────┐          ┌──────────┐         ┌──────────┐          │
+│  │selected│          │isSelected│         │ ontoggle │          │
+│  │  prop  │          │ callback │         │ callback │          │
+│  └────┬───┘          └────┬─────┘         └────┬─────┘          │
+│       │                   │                    │                │
+│       └───────────────────┼────────────────────┘                │
+│                           ▼                                     │
+│            ┌──────────────────────────────┐                     │
+│            │      HierarchyTree           │                     │
+│            │  • checkSelected() for UI    │                     │
+│            │  • handleNodeClick()         │                     │
+│            └──────────────────────────────┘                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Resource Type Configuration (`$lib/rdf/resource-types.ts`)
+### Type System
 
-Central registry defining all supported RDF resource types:
-
-```typescript
-interface ResourceTypeConfig {
-    id: string;
-    label: string;
-    pluralLabel: string;
-    typeIris: NamedNode[];           // rdf:type values
-    hierarchyPredicates: NamedNode[]; // e.g., rdfs:subClassOf
-    badge: string;
-    emptyLabel: string;
-    order: number;
-}
-
-// Current registry:
-RESOURCE_TYPES = {
-    annotationProperty,  // owl:AnnotationProperty → rdfs:subPropertyOf
-    class,               // rdfs:Class → rdfs:subClassOf
-    nodeShape,           // sh:NodeShape → sh:node
-    propertyShape,       // sh:PropertyShape (no hierarchy)
-    owlClass,            // owl:Class → rdfs:subClassOf but more complex axioms w/ restrictions and unnamed ancestors
-    datatypeProperty,    // owl:DatatypeProperty → rdfs:subPropertyOf
-    objectProperty,      // owl:ObjectProperty → rdfs:subPropertyOf
-}
+```
+ResourceTypeId (RDF-based)         ViewProfileId (UI-specific)
+├─ 'class'                    ──→  ├─ 'class'
+├─ 'nodeShape'                ──→  ├─ 'nodeShape'  
+├─ 'annotationProperty'       ──→  ├─ 'annotationProperty'
+├─ 'propertyShape'            ──→  ├─ 'propertyShape'
+                                   ├─ 'shapeClass' (dual type)
+                                   └─ 'unknown'
 ```
 
-### View Profiles (`$lib/rdf/view-profiles.ts`)
+Later we will add owlClass, objectProperty and datatypeProperty to the mix.
 
-UI-specific type detection and section composition:
+### Tab-Aware Section Composition
 
-```typescript
-// Determine how to present a resource
-getViewProfile(store, resource): ViewProfile
-// → { id: 'shapeClass', preferredTab: 'class' }
+`getSectionsForResource(store, resource, activeTab)` returns sections based on:
+1. Resource's RDF types
+2. **Active tab** (for dual-type resources like ShapeClass)
 
-// Get sections to display
-getSectionsForResource(store, resource): SectionConfig[]
-// → [
-//     { type: 'annotation', props: {} },
-//     { type: 'target', props: {} },
-//     { type: 'hierarchy', title: 'Superclasses', props: { predicates: [...] } },
-//     { type: 'propertyShapes', props: {} }
-//   ]
-
-// Helper checks
-hasPropertyShapes(store, resource): boolean
-hasTargets(store, resource): boolean
-isResourceTypeId(id): boolean  // excludes 'shapeClass', 'unknown'
-```
-
-### Context (`$lib/components/rdf/context.ts`)
-
-Shared state via Svelte context:
-
-```typescript
-interface RdfEditorContext {
-    store: RdfStore;
-    
-    // Single selection
-    readonly selectedResource: NamedNode | BlankNode | null;
-    setSelected: (resource: NamedNode | BlankNode | null) => void;
-    
-    // Multi-selection (optional, for shift-click)
-    readonly selectedResources?: ReadonlySet<string>;
-    toggleSelection?: (resource: NamedNode | BlankNode, multi: boolean) => void;
-    clearSelection?: () => void;
-    isSelected?: (resource: NamedNode | BlankNode) => boolean;
-}
-
-// Factory for full multi-selection support (NOT YET USED)
-createRdfContext(store: RdfStore, selection: SelectionState): RdfEditorContext
-```
+Example: `Person` is both `rdfs:Class` and `sh:NodeShape`
+- **Classes tab**: Annotations + Hierarchy (rdfs:subClassOf)
+- **Node Shapes tab**: Annotations + Targets + Properties + Hierarchy (sh:node)
 
 ---
 
-## Core Components
+### SelectionState Interface
 
-### 1. HierarchyTree
-
-Generic tree browser for any RDF type hierarchy.
-
-**Props:**
-- `resourceType: NamedNode` - The rdf:type to browse
-- `hierarchyPredicate: NamedNode` - Property defining parent-child
-- `selected: NamedNode | BlankNode | null` - Currently selected (bindable)
-- `onselect, onadd, onaddchild, onremove` - Event callbacks
-- `nodeContent?: Snippet` - Custom node rendering
-
-**Features:**
-- **Debounced search** (150ms) for performance on large trees
-- Auto-expand ancestors when selection changes externally
-- Expand/collapse state via `createExpandableSet()` utility
-- Toolbar actions: add sibling, add child, remove
-- Multi-selection ready (checks `ctx.toggleSelection`)
-
-### 2. ResourceDetailPanel
-
-Container displaying header + collapsible sections.
-
-**Props:**
-- `subject: NamedNode | BlankNode | null`
-- `children: Snippet` - Section components to render
-
-### 3. Section Components
-
-| Component | Purpose | Trigger Condition |
-|-----------|---------|-------------------|
-| `AnnotationSection` | View/edit annotations | Always shown |
-| `HierarchySection` | View/edit hierarchy | If `hierarchyPredicates.length > 0` |
-| `TargetSection` | View SHACL targets | If `hasTargets()` |
-| `PropertyShapeSection` | View sh:PropertyShape | If `hasPropertyShapes()` |
-
-### 4. Editor Dialogs
-
-| Dialog | Purpose |
-|--------|---------|
-| `LiteralEditorDialog` | Create/edit literal values with datatype selection |
-| `CreateResourceDialog` | Create new resources with namespace selection |
-| `HierarchyEditorDialog` | Add/edit hierarchy relations with cycle detection |
-
-More to come, e.g., SHACL PropertyShape editor (this will be quite complex, including constraints, nesting, etc.)
-
-### 5. Shared Components
-
-- **IriTooltip**: Button/tooltip showing full/compact IRI
-- **ResourceSelector**: Searchable popover for resource selection
-- **BaseSection**: Collapsible section wrapper with header, count, add button
+```typescript
+interface SelectionState {
+    readonly selected: SelectableNode | null;     // Primary (for detail panel)
+    readonly selectedSet: ReadonlySet<string>;    // All selected IRIs
+    readonly count: number;
+    readonly isMulti: boolean;
+    
+    select: (resource: SelectableNode | null) => void;  // Single select
+    toggle: (resource: SelectableNode, multi: boolean) => void;  // Multi-select
+    isSelected: (resource: SelectableNode) => boolean;
+    clear: () => void;
+    getSelectedIris: () => string[];
+}
+```
 
 ---
 
@@ -239,37 +179,17 @@ More to come, e.g., SHACL PropertyShape editor (this will be quite complex, incl
 ```
 src/lib/
 ├── components/rdf/
-│   ├── context.ts                 # RdfEditorContext + createRdfContext
-│   ├── index.ts                   # Re-exports
-│   ├── tree/
-│   │   ├── HierarchyTree.svelte   # With debounced search TODO: decompose into different components
-│   │   └── index.ts
-│   ├── sections/
-│   │   ├── BaseSection.svelte
-│   │   ├── AnnotationSection.svelte
-│   │   ├── HierarchySection.svelte
-│   │   ├── TargetSection.svelte            # NEW
-│   │   ├── PropertyShapeSection.svelte     # NEW
-│   │   └── index.ts
-│   ├── editors/ # TODO: add more datatype specific components for e.g., xsd:date
-│   │   ├── LiteralEditorDialog.svelte
-│   │   ├── CreateResourceDialog.svelte
-│   │   ├── HierarchyEditorDialog.svelte
-│   │   ├── DatatypeSelector.svelte
-│   │   ├── LangStringEditor.svelte
-│   │   └── index.ts
-│   ├── panels/
-│   │   ├── ResourceDetailPanel.svelte
-│   │   └── index.ts
-│   └── shared/
-│       ├── IriTooltip.svelte
-│       ├── ResourceSelector.svelte
-│       └── index.ts
+│   ├── context.ts                 # RdfEditorContext
+│   ├── tree/HierarchyTree.svelte  # With multi-select support TODO: decompose into multiple components
+│   ├── sections/                  # Annotation, Hierarchy, Target, PropertyShape
+│   ├── editors/                   # Dialog components
+│   ├── panels/                    # ResourceDetailPanel
+│   └── shared/                    # IriTooltip, ResourceSelector
 ├── rdf/
 │   ├── namespaces.ts              # RDF namespace helpers + toCompactIri
 │   ├── datatypes.ts               # Datatype registry + validation + hints
 │   ├── resource-types.ts          # Resource type configuration
-│   ├── view-profiles.ts           # ViewProfileId + getSectionsForResource
+│   ├── view-profiles.ts           # Tab-aware section composition
 │   └── queries/
 │       ├── hierarchy.ts           # Tree building, CRUD, cycle detection
 │       ├── annotations.ts         # Annotation queries
@@ -278,59 +198,31 @@ src/lib/
 ├── stores/
 │   └── rdf.svelte.ts              # Reactive N3.Store wrapper
 └── utils/
-    ├── expandable.svelte.ts       # Expand/collapse utility
-    ├── debounce.svelte.ts         # Debounce utility (USED in HierarchyTree, could maybe also be used in ResourceSelector)
-    ├── selection.svelte.ts        # Selection utility (NOT YET USED)
-    ├── dialog.svelte.ts           # Dialog state utility (NOT YET USED)
-    └── index.ts
+    ├── selection.svelte.ts        # createSelectionState, createKeyedSelectionState
+    ├── dialog.svelte.ts           # createDialogState, createConfirmDialog
+    ├── expandable.svelte.ts       # createExpandableSet
+    └── debounce.svelte.ts         # createDebounced
 ```
 
 ---
 
-## Next Sprint: Integration Tasks
+## Next Steps
 
-- Wire Multi-Selection into UI for batch editing operations (for now just "Delete selected")
-- Replace Dialog State Variables using createDialogState utility to reduce boilerplate
-- Dynamic Section Composition with getSectionsForResource utility
-- Add Drag-and-Drop to HierarchyTree (using `svelte-dnd-action` for hierarchy modifications)
-- Implement SHACL NodeShape and PropertyShape integration with new tabs, starting with `02-simple-shacl.ttl`
+### High Priority
+- [x] Test multi-select across tabs thoroughly
+- [x] Clean up codebase and simplify/decompose/refactor where possible
+- [ ] Add keyboard shortcuts (Delete, Escape to clear selection)
+- [ ] Drag-and-drop hierarchy editing with `svelte-dnd-action`
+- [ ] SHACL PropertyShape editor
+
+### Medium Priority
+- [ ] Tab for viewing/editing sh:PropertyShape (don't have hierarchy)
+- [ ] Tree virtualization for large graphs with `@tanstack/svelte-virtual`
+- [ ] Undo/redo support and back/forward in navigation
+- [ ] Additional datatype editors
 
 ### Lower Priority
-
-- Back and forward navigation, Ctrl+Z/Y for undo/redo and improved keyboard-only UX
-- Tree Virtualization for Large Graphs (using `@tanstack/svelte-virtual`)
-- Additional Datatype Editors (e.g., date picker for `xsd:date`, `xsd:dateTime`, number spinner with constraints for `xsd:integer`, duration editor for `xsd:duration`, etc.)
-- Simplify component props by ragarding URI as ID and determining label (CURIE) from it
-
-### Down the road
-
-- Set up testing infrastructure
-- More complex SHACL shapes and predicate paths, nested PropertyShapes, sh:node, etc.
-- Sidebar for dashboard with graphs overview & statistics, search panel, AI panel, ...
-- OWL Class integration (with restrictions, equivalence, disjoint, etc.)
-- OWL Datatype and ObjectProperty integration (with characteristics, subproperty chains) are used in PropertyShape sh:path
-- Creation of instance data with SHACL validation
-- OWL inference support (RDFS, RDFS-plus, OWL-RL, custom N3 rules)
-- Pick back up on FLOW implementation (should be easier now that we have clearer API and reusable components)
-- Re-integrate with FastAPI backend and dedicated triple store for AI workflows, user management, long-term storage, ...
-
----
-
-## SHACL Support Status
-
-NOT YET TESTED OR IMPLEMENTED: see `02-simple-shacl.ttl` and `xx-complex-paths.ttl` for examples.
-
-### sh:NodeShape ✅
-- **TargetSection**: Shows `sh:targetClass`, `sh:targetNode`, `sh:targetSubjectsOf`, `sh:targetObjectsOf`
-- **PropertyShapeSection**: Lists `sh:property` shapes with path, constraints, cardinality
-- **Hierarchy**: Via `sh:node` predicate
-
-### sh:ShapeClass (SHACL 1.2) ✅
-- Detected via `isShapeClass()` (dual rdfs:Class + sh:NodeShape)
-- **Or** explicit `sh:ShapeClass` type (SHACL 1.2)
-- Hierarchy from BOTH `rdfs:subClassOf` AND `sh:node`
-- All sections from both types via `getSectionsForResource()`
-
-### sh:PropertyShape 🚧
-- Can be displayed but not yet editable
-- Editor dialog needed for constraint definition
+- [ ] SHACL 1.2 ShapeClass which is a combination of rdfs/owl:Class and sh:NodeShape
+- [ ] OWL Class support with restrictions
+- [ ] OWL ObjectProperty support with characteristics and subproperty chain
+- [ ] Testing infrastructure

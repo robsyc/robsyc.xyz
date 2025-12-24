@@ -129,7 +129,12 @@ export function createConfirmDialog(): ConfirmDialogState {
     const base = createDialogState<ConfirmDialogData>();
 
     return {
-        ...base,
+        // Explicitly forward getters to preserve reactivity
+        get open() { return base.open; },
+        get data() { return base.data; },
+        show: base.show,
+        close: base.close,
+        toggle: base.toggle,
 
         execute() {
             base.data?.onConfirm();

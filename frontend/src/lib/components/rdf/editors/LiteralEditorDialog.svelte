@@ -31,7 +31,7 @@
     }
 
     let {
-        open = $bindable(false),
+        open = false,
         subject,
         predicate: initialPredicate,
         existingValue,
@@ -204,12 +204,10 @@
         }
         
         onsubmit?.();
-        open = false;
     }
 
     function handleClose() {
         onclose?.();
-        open = false;
     }
 
     function handlePropertySelect(prop: NamedNode | BlankNode | null) {
@@ -228,7 +226,7 @@
     }
 </script>
 
-<Dialog.Root bind:open onOpenChange={(o) => !o && handleClose()}>
+<Dialog.Root {open} onOpenChange={(o) => !o && handleClose()}>
     <Dialog.Content class="!max-w-[80vw] w-[80vw] h-[600px] flex flex-col">
         <Dialog.Header>
             <Dialog.Title>{existingValue ? 'Edit' : 'Add'} Annotation</Dialog.Title>

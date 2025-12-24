@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { NamedNode, BlankNode } from 'n3';
+    import { DataFactory } from 'n3';
     import { onMount } from 'svelte';
     import { Download, RefreshCw } from '@lucide/svelte';
     import { Button } from '$lib/components/ui/button/index.js';
@@ -10,14 +11,18 @@
     import { rdfStore } from '$lib/stores/rdf.svelte';
     import { 
         setRdfContext,
+        createRdfContext,
         HierarchyTree,
         ResourceDetailPanel,
         AnnotationSection,
         HierarchySection,
+        TargetSection,
+        PropertyShapeSection,
         LiteralEditorDialog,
         CreateResourceDialog,
         HierarchyEditorDialog
     } from '$lib/components/rdf';
+    import { createKeyedSelectionState } from '$lib/utils/selection.svelte';
     import { 
         removeResourceRecursive, 
         removeHierarchyRelation,
@@ -29,10 +34,10 @@
         type ResourceTypeId,
         getViewableResourceTypes,
         getPrimaryTypeIri,
-        getPrimaryHierarchyPredicate,
-        getHierarchyPredicatesForResource
+        getPrimaryHierarchyPredicate
     } from '$lib/rdf/resource-types';
-    import { chooseTabForResource } from '$lib/rdf/view-profiles';
+    import { chooseTabForResource, getSectionsForResource } from '$lib/rdf/view-profiles';
+    import { createDialogState, createConfirmDialog } from '$lib/utils/dialog.svelte';
 
     // Get resource types to display as tabs (from centralized config)
     const TABS = getViewableResourceTypes();
@@ -42,54 +47,66 @@
     const currentTabConfig = $derived(TABS.find(t => t.id === activeTab)!);
     const currentHierarchyPredicate = $derived(getPrimaryHierarchyPredicate(currentTabConfig));
 
-    // Selected resource state (per tab to preserve selection when switching)
-    let selectedByTab = $state<Record<string, NamedNode | BlankNode | null>>(
-        Object.fromEntries(TABS.map(t => [t.id, null]))
-    );
-    const selectedResource = $derived(selectedByTab[activeTab]);
+    // Selection state using keyed selection utility (per-tab with multi-select support)
+    const selections = createKeyedSelectionState(TABS.map(t => t.id));
+    const activeSelection = $derived(selections.get(activeTab));
+    const selectedResource = $derived(activeSelection.selected);
     
     // Loading state
     let isLoading = $state(true);
     let loadError = $state<string | null>(null);
 
-    // Dialog state
-    let annotationDialogOpen = $state(false);
-    let annotationSubject = $state<NamedNode | BlankNode | null>(null);
-    let annotationPredicate = $state<NamedNode | undefined>(undefined);
-    let annotationEditingValue = $state<AnnotationValue | undefined>(undefined);
+    // Dialog state using utilities
+    const annotationDialog = createDialogState<{
+        subject: NamedNode | BlankNode;
+        predicate?: NamedNode;
+        editingValue?: AnnotationValue;
+    }>();
 
-    let createDialogOpen = $state(false);
-    let createParent = $state<NamedNode | BlankNode | null>(null);
+    const createResourceDialog = createDialogState<{
+        parent: NamedNode | BlankNode | null;
+    }>();
 
-    let hierarchyDialogOpen = $state(false);
-    let hierarchySubject = $state<NamedNode | BlankNode | null>(null);
-    let hierarchyPredicate = $state<NamedNode | null>(null);
-    let hierarchyExistingParent = $state<NamedNode | BlankNode | null>(null);
+    const hierarchyDialog = createDialogState<{
+        subject: NamedNode | BlankNode;
+        predicate: NamedNode;
+        existingParent: NamedNode | BlankNode | null;
+    }>();
 
-    // Confirmation dialog state
-    let confirmDialogOpen = $state(false);
-    let confirmDialogTitle = $state('');
-    let confirmDialogDescription = $state('');
-    let confirmDialogAction = $state<(() => void) | null>(null);
+    const confirmDialog = createConfirmDialog();
 
-    function showConfirmDialog(title: string, description: string, onConfirm: () => void) {
-        confirmDialogTitle = title;
-        confirmDialogDescription = description;
-        confirmDialogAction = onConfirm;
-        confirmDialogOpen = true;
+    // Navigation callbacks for cross-component navigation
+    // Defined before context so they can be included in it
+    function navigateToResource(resource: NamedNode | BlankNode) {
+        const availableTabs = new Set(TABS.map(t => t.id));
+        const tab = chooseTabForResource(rdfStore, resource, availableTabs);
+
+        if (tab) {
+            activeTab = tab;
+            selections.setSelected(tab, resource);
+            return;
+        }
+
+        // Fallback: stay on current tab
+        activeSelection.select(resource);
     }
 
-    function handleConfirmDialogAction() {
-        confirmDialogAction?.();
-        confirmDialogOpen = false;
+    function navigateToPredicate(predicate: NamedNode) {
+        // Navigate to annotation property tab and select the predicate
+        activeTab = 'annotationProperty';
+        selections.setSelected('annotationProperty', predicate);
     }
 
-    // Set up context
-    setRdfContext({
+    // Set up context with store, selection, and navigation
+    // Uses getSelection() pattern so tab switches update the active selection
+    setRdfContext(createRdfContext({
         store: rdfStore,
-        get selectedResource() { return selectedResource; },
-        setSelected: (resource) => { selectedByTab[activeTab] = resource; }
-    });
+        getSelection: () => activeSelection,
+        navigation: {
+            toResource: navigateToResource,
+            toPredicate: navigateToPredicate,
+        }
+    }));
 
     // Store size for display
     const storeSize = $derived(rdfStore.size);
@@ -104,6 +121,7 @@
         try {
             await Promise.all([
                 rdfStore.load({ url: '/graphs/tests/01-basic-classes.ttl' }),
+                rdfStore.load({ url: '/graphs/tests/02-simple-shacl.ttl' }),
                 rdfStore.load({ url: '/graphs/config/owlAnnotationProperty.ttl' })
             ]);
             console.log(`Loaded ${rdfStore.size} quads`);
@@ -119,7 +137,7 @@
 
     async function handleReload() {
         rdfStore.clear();
-        selectedByTab = Object.fromEntries(TABS.map(t => [t.id, null]));
+        selections.clearAll();
         await loadData();
     }
 
@@ -142,25 +160,14 @@
     
     const annotationHandlers = {
         add: (subject: NamedNode | BlankNode) => {
-            annotationSubject = subject;
-            annotationPredicate = undefined;
-            annotationEditingValue = undefined;
-            annotationDialogOpen = true;
-        },
-        addValue: (subject: NamedNode | BlankNode, predicate: NamedNode) => {
-            annotationSubject = subject;
-            annotationPredicate = predicate;
-            annotationEditingValue = undefined;
-            annotationDialogOpen = true;
+            annotationDialog.show({ subject });
         },
         edit: (value: AnnotationValue) => {
-            annotationSubject = value.quad.subject as NamedNode | BlankNode;
-            annotationPredicate = value.quad.predicate as NamedNode;
-            annotationEditingValue = value;
-            annotationDialogOpen = true;
-        },
-        close: () => {
-            annotationDialogOpen = false;
+            annotationDialog.show({
+                subject: value.quad.subject as NamedNode | BlankNode,
+                predicate: value.quad.predicate as NamedNode,
+                editingValue: value
+            });
         },
     };
 
@@ -170,19 +177,44 @@
     
     const resourceHandlers = {
         add: (parent: NamedNode | BlankNode | null) => {
-            createParent = parent;
-            createDialogOpen = true;
+            createResourceDialog.show({ parent });
         },
         addChild: (parent: NamedNode | BlankNode) => {
-            createParent = parent;
-            createDialogOpen = true;
+            createResourceDialog.show({ parent });
         },
         created: (resource: NamedNode) => {
-            selectedByTab[activeTab] = resource;
+            activeSelection.select(resource);
         },
+        /**
+         * Remove handler - handles both single and multi-select deletion.
+         * When multi-select is active, deletes all selected resources.
+         * When single-select, deletes just the passed resource.
+         */
         remove: (resource: NamedNode | BlankNode) => {
             const config = currentTabConfig;
             const predicate = getPrimaryHierarchyPredicate(config);
+            const count = activeSelection.count;
+            
+            // Multi-select: delete all selected resources
+            if (count > 1) {
+                confirmDialog.show({
+                    title: `Delete ${count} ${config.pluralLabel}?`,
+                    description: `This will permanently delete ${count} selected ${config.label.toLowerCase()}s and all their properties.`,
+                    onConfirm: () => {
+                        const selectedIris = activeSelection.getSelectedIris();
+                        rdfStore.transaction(() => {
+                            for (const iri of selectedIris) {
+                                const node = DataFactory.namedNode(iri);
+                                removeResourceRecursive(rdfStore, node, predicate);
+                            }
+                        });
+                        activeSelection.clear();
+                    }
+                });
+                return;
+            }
+            
+            // Single-select: delete just this resource
             const label = getResourceLabel(rdfStore, resource);
             const children = predicate ? getChildren(rdfStore, resource, predicate) : [];
             
@@ -191,14 +223,14 @@
                 description += ` This will also delete ${children.length} child${children.length > 1 ? 'ren' : ''} and all their properties.`;
             }
             
-            showConfirmDialog(
-                `Delete ${config.label}?`,
+            confirmDialog.show({
+                title: `Delete ${config.label}?`,
                 description,
-                () => {
+                onConfirm: () => {
                     removeResourceRecursive(rdfStore, resource, predicate);
-                    selectedByTab[activeTab] = null;
+                    activeSelection.clear();
                 }
-            );
+            });
         },
     };
 
@@ -208,60 +240,36 @@
     
     const hierarchyHandlers = {
         add: (subject: NamedNode | BlankNode, predicate: NamedNode) => {
-            hierarchySubject = subject;
-            hierarchyPredicate = predicate;
-            hierarchyExistingParent = null;
-            hierarchyDialogOpen = true;
+            hierarchyDialog.show({ subject, predicate, existingParent: null });
         },
         edit: (subject: NamedNode | BlankNode, predicate: NamedNode, existingParent: NamedNode | BlankNode) => {
-            hierarchySubject = subject;
-            hierarchyPredicate = predicate;
-            hierarchyExistingParent = existingParent;
-            hierarchyDialogOpen = true;
+            hierarchyDialog.show({ subject, predicate, existingParent });
         },
         remove: (subject: NamedNode | BlankNode, predicate: NamedNode, object: NamedNode | BlankNode) => {
             const subjectLabel = getResourceLabel(rdfStore, subject);
             const objectLabel = getResourceLabel(rdfStore, object);
             
-            showConfirmDialog(
-                'Remove Relationship?',
-                `Remove "${subjectLabel}" as a subtype of "${objectLabel}"?`,
-                () => {
+            confirmDialog.show({
+                title: 'Remove Relationship?',
+                description: `Remove "${subjectLabel}" as a subtype of "${objectLabel}"?`,
+                onConfirm: () => {
                     removeHierarchyRelation(rdfStore, subject, predicate, object);
                 }
-            );
-        },
-        close: () => {
-            hierarchyDialogOpen = false;
+            });
         },
     };
 
     /**************************************************************************
-     * Navigation Handlers
+     * Navigation Handlers (wrapper for prop-based navigation)
+     * Components can also use context.navigation directly
      **************************************************************************/
     
     const navigationHandlers = {
         select: (resource: NamedNode | BlankNode | null) => {
-            selectedByTab[activeTab] = resource;
+            activeSelection.select(resource);
         },
-        toPredicate: (predicate: NamedNode) => {
-            // Navigate to annotation property tab and select the predicate
-            activeTab = 'annotationProperty';
-            selectedByTab.annotationProperty = predicate;
-        },
-        toResource: (resource: NamedNode) => {
-            const availableTabs = new Set(Object.keys(selectedByTab));
-            const tab = chooseTabForResource(rdfStore, resource, availableTabs);
-
-            if (tab && selectedByTab[tab] !== undefined) {
-                activeTab = tab;
-                selectedByTab[tab] = resource;
-                return;
-            }
-
-            // Fallback: stay on current tab
-            selectedByTab[activeTab] = resource;
-        },
+        toPredicate: navigateToPredicate,
+        toResource: navigateToResource,
     };
 </script>
 
@@ -330,7 +338,10 @@
                         resourceType={getPrimaryTypeIri(currentTabConfig)}
                         hierarchyPredicate={currentHierarchyPredicate}
                         selected={selectedResource}
+                        isSelected={(node) => activeSelection.isSelected(node)}
                         onselect={navigationHandlers.select}
+                        ontoggle={(resource) => activeSelection.toggle(resource, true)}
+                        selectionCount={activeSelection.count}
                         typeBadge={currentTabConfig.badge}
                         emptyLabel={currentTabConfig.emptyLabel}
                         onadd={resourceHandlers.add}
@@ -338,29 +349,42 @@
                         onremove={resourceHandlers.remove}
                     />
                     
-                    <!-- Right: Detail panel with sections -->
+                    <!-- Right: Detail panel with dynamic sections -->
                     <ResourceDetailPanel subject={selectedResource}>
                         {#if selectedResource}
-                            {@const hierarchyPredicates = getHierarchyPredicatesForResource(rdfStore, selectedResource)}
-                            <AnnotationSection 
-                                subject={selectedResource}
-                                onadd={annotationHandlers.add}
-                                onaddvalue={annotationHandlers.addValue}
-                                onedit={annotationHandlers.edit}
-                                onpredicateclick={navigationHandlers.toPredicate}
-                                onvalueclick={navigationHandlers.toResource}
-                            />
-                            {#if hierarchyPredicates.length > 0 || currentHierarchyPredicate}
-                                <HierarchySection
-                                    subject={selectedResource}
-                                    predicates={hierarchyPredicates.length > 0 ? hierarchyPredicates : currentHierarchyPredicate ? [currentHierarchyPredicate] : []}
-                                    onnavigate={navigationHandlers.select}
-                                    onpredicateclick={navigationHandlers.toPredicate}
-                                    onadd={hierarchyHandlers.add}
-                                    onedit={hierarchyHandlers.edit}
-                                    onremove={hierarchyHandlers.remove}
-                                />
-                            {/if}
+                            {@const sections = getSectionsForResource(rdfStore, selectedResource, activeTab)}
+                            {#each sections as section (section.type)}
+                                {#if section.type === 'annotation'}
+                                    <AnnotationSection 
+                                        subject={selectedResource}
+                                        onadd={annotationHandlers.add}
+                                        onedit={annotationHandlers.edit}
+                                        onpredicateclick={navigationHandlers.toPredicate}
+                                        onvalueclick={navigationHandlers.toResource}
+                                    />
+                                {:else if section.type === 'target'}
+                                    <TargetSection
+                                        subject={selectedResource}
+                                        onnavigate={navigationHandlers.toResource}
+                                    />
+                                {:else if section.type === 'hierarchy'}
+                                    <HierarchySection
+                                        subject={selectedResource}
+                                        predicates={section.props.predicates as import('n3').NamedNode[]}
+                                        label={section.title}
+                                        onnavigate={navigationHandlers.select}
+                                        onpredicateclick={navigationHandlers.toPredicate}
+                                        onadd={hierarchyHandlers.add}
+                                        onedit={hierarchyHandlers.edit}
+                                        onremove={hierarchyHandlers.remove}
+                                    />
+                                {:else if section.type === 'propertyShapes'}
+                                    <PropertyShapeSection
+                                        subject={selectedResource}
+                                        onpathclick={navigationHandlers.toPredicate}
+                                    />
+                                {/if}
+                            {/each}
                         {/if}
                     </ResourceDetailPanel>
                 </div>
@@ -370,53 +394,58 @@
 </div>
 
 <!-- Create Resource Dialog (generic for current tab) -->
-<CreateResourceDialog
-    bind:open={createDialogOpen}
-    resourceType={getPrimaryTypeIri(currentTabConfig)}
-    parent={createParent}
-    hierarchyPredicate={currentHierarchyPredicate ?? undefined}
-    typeLabel={currentTabConfig.label}
-    oncreate={resourceHandlers.created}
-/>
+{#if createResourceDialog.open && createResourceDialog.data}
+    <CreateResourceDialog
+        open={createResourceDialog.open}
+        resourceType={getPrimaryTypeIri(currentTabConfig)}
+        parent={createResourceDialog.data.parent}
+        hierarchyPredicate={currentHierarchyPredicate ?? undefined}
+        typeLabel={currentTabConfig.label}
+        oncreate={resourceHandlers.created}
+        onclose={createResourceDialog.close}
+    />
+{/if}
 
 <!-- Add/Edit Annotation Dialog -->
-{#if annotationSubject && annotationDialogOpen}
+{#if annotationDialog.open && annotationDialog.data}
     <LiteralEditorDialog
-        bind:open={annotationDialogOpen}
-        subject={annotationSubject}
-        predicate={annotationPredicate}
-        existingValue={annotationEditingValue}
-        onsubmit={annotationHandlers.close}
-        onclose={annotationHandlers.close}
+        open={annotationDialog.open}
+        subject={annotationDialog.data.subject}
+        predicate={annotationDialog.data.predicate}
+        existingValue={annotationDialog.data.editingValue}
+        onsubmit={annotationDialog.close}
+        onclose={annotationDialog.close}
     />
 {/if}
 
 <!-- Hierarchy Editor Dialog (for adding/editing subClassOf/subPropertyOf) -->
-{#if hierarchySubject && hierarchyPredicate}
+{#if hierarchyDialog.open && hierarchyDialog.data}
     <HierarchyEditorDialog
-        bind:open={hierarchyDialogOpen}
-        subject={hierarchySubject}
-        predicate={hierarchyPredicate}
-        existingParent={hierarchyExistingParent}
+        open={hierarchyDialog.open}
+        subject={hierarchyDialog.data.subject}
+        predicate={hierarchyDialog.data.predicate}
+        existingParent={hierarchyDialog.data.existingParent}
         resourceType={getPrimaryTypeIri(currentTabConfig)}
-        dialogTitle={hierarchyExistingParent 
+        dialogTitle={hierarchyDialog.data.existingParent 
             ? (activeTab === 'class' ? 'Edit Superclass' : 'Edit Parent Property')
             : (activeTab === 'class' ? 'Add Superclass' : 'Add Parent Property')}
-        onsubmit={hierarchyHandlers.close}
-        onclose={hierarchyHandlers.close}
+        onsubmit={hierarchyDialog.close}
+        onclose={hierarchyDialog.close}
     />
 {/if}
 
 <!-- Confirmation Dialog -->
-<AlertDialog.Root bind:open={confirmDialogOpen}>
-    <AlertDialog.Content>
-        <AlertDialog.Header>
-            <AlertDialog.Title>{confirmDialogTitle}</AlertDialog.Title>
-            <AlertDialog.Description>{confirmDialogDescription}</AlertDialog.Description>
-        </AlertDialog.Header>
-        <AlertDialog.Footer>
-            <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-            <AlertDialog.Action onclick={handleConfirmDialogAction}>Continue</AlertDialog.Action>
-        </AlertDialog.Footer>
-    </AlertDialog.Content>
-</AlertDialog.Root>
+{#if confirmDialog.open && confirmDialog.data}
+    <AlertDialog.Root open={confirmDialog.open} onOpenChange={(open) => !open && confirmDialog.close()}>
+        <AlertDialog.Content>
+            <AlertDialog.Header>
+                <AlertDialog.Title>{confirmDialog.data.title}</AlertDialog.Title>
+                <AlertDialog.Description>{confirmDialog.data.description}</AlertDialog.Description>
+            </AlertDialog.Header>
+            <AlertDialog.Footer>
+                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                <AlertDialog.Action onclick={confirmDialog.execute}>Continue</AlertDialog.Action>
+            </AlertDialog.Footer>
+        </AlertDialog.Content>
+    </AlertDialog.Root>
+{/if}

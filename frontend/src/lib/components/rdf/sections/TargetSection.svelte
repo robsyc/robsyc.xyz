@@ -1,12 +1,9 @@
 <script lang="ts">
     import type { NamedNode, BlankNode } from 'n3';
-    import { Trash2, ExternalLink } from '@lucide/svelte';
-    import { Button } from '$lib/components/ui/button/index.js';
-    import { Badge } from '$lib/components/ui/badge/index.js';
     import { getRdfContext } from '../context';
     import { getShapeTargets, type ShapeTarget } from '$lib/rdf/queries';
     import { toCompactIri } from '$lib/rdf/namespaces';
-    import { IriTooltip } from '../shared';
+    import { SectionGroup, SectionItem } from '../shared';
     import BaseSection from './BaseSection.svelte';
 
     interface Props {
@@ -36,6 +33,9 @@
     const ctx = getRdfContext();
     const store = ctx.store;
 
+    // Use context navigation as fallback if prop isn't provided
+    const navigateToResource = $derived(onnavigate ?? ctx.navigation.toResource);
+
     // Get targets for this shape
     const targets = $derived(getShapeTargets(store, subject));
 
@@ -61,10 +61,8 @@
         objectsOf: 'Objects Of'
     };
 
-    function handleNavigate(target: ShapeTarget) {
-        if (target.value.termType === 'NamedNode' || target.value.termType === 'BlankNode') {
-            onnavigate?.(target.value as NamedNode | BlankNode);
-        }
+    function isNavigable(target: ShapeTarget): boolean {
+        return target.value.termType === 'NamedNode' || target.value.termType === 'BlankNode';
     }
 </script>
 
@@ -76,58 +74,28 @@
     onadd={onadd ? () => onadd?.(subject) : undefined}
     addTitle="Add target"
 >
-    {#each Object.entries(groupedTargets) as [type, typeTargets] (type)}
-        {#if typeTargets.length > 0}
-            <div class="py-2 px-3 border-b last:border-b-0">
-                <div class="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <span class="w-3"></span>
-                    <span class="font-medium">{typeLabels[type]}</span>
-                    {#if typeTargets.length > 1}
-                        <Badge variant="secondary" class="text-xs h-5">
-                            {typeTargets.length}
-                        </Badge>
-                    {/if}
-                </div>
-                
-                <div class="space-y-1 pl-5">
+    <div class="divide-y">
+        {#each Object.entries(groupedTargets) as [type, typeTargets] (type)}
+            {#if typeTargets.length > 0}
+                <SectionGroup
+                    label={typeLabels[type]}
+                    count={typeTargets.length}
+                    collapsible={false}
+                >
                     {#each typeTargets as target (target.value.value)}
-                        {@const isNavigable = target.value.termType === 'NamedNode' || target.value.termType === 'BlankNode'}
+                        {@const canNavigate = isNavigable(target)}
                         {@const compactIri = target.value.termType === 'NamedNode' ? toCompactIri(target.value.value) : target.value.value}
                         
-                        <div class="flex items-center justify-between group py-1">
-                            {#if isNavigable && target.value.termType === 'NamedNode'}
-                                <IriTooltip
-                                    term={target.value as NamedNode}
-                                    class="flex flex-col items-start min-w-0 text-left {onnavigate ? 'hover:text-primary cursor-pointer' : ''}"
-                                    onclick={onnavigate ? () => handleNavigate(target) : undefined}
-                                >
-                                    <span class="text-sm font-medium truncate {onnavigate ? 'hover:underline' : ''}">{target.displayValue}</span>
-                                    <span class="text-xs text-muted-foreground font-mono truncate">{compactIri}</span>
-                                </IriTooltip>
-                            {:else}
-                                <div class="flex flex-col items-start min-w-0">
-                                    <span class="text-sm font-medium truncate">{target.displayValue}</span>
-                                    <span class="text-xs text-muted-foreground font-mono truncate">{compactIri}</span>
-                                </div>
-                            {/if}
-                            
-                            {#if onremove}
-                                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-6 w-6 text-destructive"
-                                        onclick={() => onremove?.(subject, target)}
-                                        title="Remove"
-                                    >
-                                        <Trash2 class="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            {/if}
-                        </div>
+                        <SectionItem
+                            label={target.displayValue}
+                            sublabel={compactIri}
+                            navigable={canNavigate && !!navigateToResource}
+                            onnavigate={canNavigate && navigateToResource ? () => navigateToResource?.(target.value as NamedNode | BlankNode) : undefined}
+                            onremove={onremove ? () => onremove?.(subject, target) : undefined}
+                        />
                     {/each}
-                </div>
-            </div>
-        {/if}
-    {/each}
+                </SectionGroup>
+            {/if}
+        {/each}
+    </div>
 </BaseSection>

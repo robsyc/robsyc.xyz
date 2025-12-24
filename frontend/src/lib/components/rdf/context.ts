@@ -2,7 +2,7 @@
  * RDF Editor Context
  * 
  * Provides shared state for RDF editing components via Svelte context.
- * Avoids prop drilling for store access and selected resource.
+ * Avoids prop drilling for store access, selection, and navigation.
  */
 
 import { getContext, setContext } from 'svelte';
@@ -12,31 +12,41 @@ import type { SelectionState } from '$lib/utils/selection.svelte';
 
 const RDF_CONTEXT_KEY = Symbol('rdf-editor');
 
+/**
+ * Navigation callbacks for cross-component navigation.
+ * These are optional and provided by the page-level component.
+ */
+export interface NavigationCallbacks {
+    /** Navigate to a resource (select it, potentially switching tabs) */
+    toResource?: (resource: NamedNode | BlankNode) => void;
+    /** Navigate to a predicate (typically switches to annotation properties tab) */
+    toPredicate?: (predicate: NamedNode) => void;
+}
+
 export interface RdfEditorContext {
     /** The RDF store instance */
     store: RdfStore;
     
-    // Single selection (backward compatible)
     /** Currently selected resource (reactive getter) */
     readonly selectedResource: NamedNode | BlankNode | null;
     /** Set the selected resource */
     setSelected: (resource: NamedNode | BlankNode | null) => void;
     
-    // Multi-selection support (optional, for future features)
-    /** 
-     * Set of selected resource IRIs for multi-select mode (optional).
-     * Components should check if this is defined before using.
-     */
-    readonly selectedResources?: ReadonlySet<string>;
-    /** 
-     * Toggle selection of a resource (for shift-click multi-select).
-     * If multi is true, adds/removes from selection. If false, replaces selection.
-     */
-    toggleSelection?: (resource: NamedNode | BlankNode, multi: boolean) => void;
+    /** Set of selected resource IRIs for multi-select mode */
+    readonly selectedSet: ReadonlySet<string>;
+    /** Number of selected items */
+    readonly selectionCount: number;
+    /** Toggle selection of a resource (for shift-click multi-select) */
+    toggleSelection: (resource: NamedNode | BlankNode, multi: boolean) => void;
     /** Clear all selections */
-    clearSelection?: () => void;
+    clearSelection: () => void;
     /** Check if a resource is selected */
-    isSelected?: (resource: NamedNode | BlankNode) => boolean;
+    isSelected: (resource: NamedNode | BlankNode) => boolean;
+    /** Get all selected IRIs as array */
+    getSelectedIris: () => string[];
+    
+    /** Navigation callbacks (optional, set by page-level component) */
+    navigation: NavigationCallbacks;
 }
 
 export function setRdfContext(context: RdfEditorContext): void {
@@ -47,40 +57,66 @@ export function getRdfContext(): RdfEditorContext {
     const ctx = getContext<RdfEditorContext>(RDF_CONTEXT_KEY);
     if (!ctx) {
         throw new Error(
-            'RDF context not found. Make sure to call setRdfContext() in a parent component. ' +
-            'Example: setRdfContext({ store: rdfStore, get selectedResource() { return selected; }, setSelected: (r) => selected = r })'
+            'RDF context not found. Make sure to call setRdfContext() in a parent component.'
         );
     }
     return ctx;
 }
 
 /**
- * Create an RdfEditorContext from an RdfStore and a SelectionState.
- * This is the recommended way to create a context with full multi-selection support.
+ * Options for creating an RdfEditorContext.
+ */
+export interface CreateRdfContextOptions {
+    store: RdfStore;
+    /** Function returning the current active selection (for reactive access) */
+    getSelection: () => SelectionState;
+    /** Navigation callbacks (optional) */
+    navigation?: NavigationCallbacks;
+}
+
+/**
+ * Create an RdfEditorContext with full selection and navigation support.
+ * 
+ * Uses a getter function for selection to support reactive tab switching.
+ * The getter is called each time a selection method is invoked, ensuring
+ * the correct per-tab selection is used.
  * 
  * @example
  * ```svelte
  * <script lang="ts">
- *   import { createSelectionState } from '$lib/utils/selection.svelte';
- *   import { createRdfContext, setRdfContext } from '$lib/components/rdf/context';
+ *   const selections = createKeyedSelectionState(TABS.map(t => t.id));
+ *   const activeSelection = $derived(selections.get(activeTab));
  *   
- *   const selection = createSelectionState();
- *   setRdfContext(createRdfContext(rdfStore, selection));
+ *   setRdfContext(createRdfContext({
+ *     store: rdfStore,
+ *     getSelection: () => activeSelection,
+ *     navigation: {
+ *       toResource: (r) => { ... },
+ *       toPredicate: (p) => { ... }
+ *     }
+ *   }));
  * </script>
  * ```
  */
-export function createRdfContext(store: RdfStore, selection: SelectionState): RdfEditorContext {
+export function createRdfContext(options: CreateRdfContextOptions): RdfEditorContext {
+    const { store, getSelection, navigation = {} } = options;
+    
     return {
         store,
         get selectedResource() {
-            return selection.selected;
+            return getSelection().selected;
         },
-        setSelected: (resource) => selection.select(resource),
-        get selectedResources() {
-            return selection.selectedSet;
+        setSelected: (resource) => getSelection().select(resource),
+        get selectedSet() {
+            return getSelection().selectedSet;
         },
-        toggleSelection: (resource, multi) => selection.toggle(resource, multi),
-        clearSelection: () => selection.clear(),
-        isSelected: (resource) => selection.isSelected(resource),
+        get selectionCount() {
+            return getSelection().count;
+        },
+        toggleSelection: (resource, multi) => getSelection().toggle(resource, multi),
+        clearSelection: () => getSelection().clear(),
+        isSelected: (resource) => getSelection().isSelected(resource),
+        getSelectedIris: () => getSelection().getSelectedIris(),
+        navigation,
     };
 }

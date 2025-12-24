@@ -43,6 +43,9 @@
     const ctx = getRdfContext();
     const store = ctx.store;
 
+    // Use context navigation as fallback if prop isn't provided
+    const navigateToPredicate = $derived(onpathclick ?? ctx.navigation.toPredicate);
+
     // Track expanded property shapes (for showing constraints)
     const expanded = createExpandableSet();
 
@@ -134,11 +137,11 @@
                         </button>
                         
                         <!-- Path/name -->
-                        {#if shape.path?.termType === 'NamedNode' && onpathclick}
+                        {#if shape.path?.termType === 'NamedNode' && navigateToPredicate}
                             <IriTooltip
                                 term={shape.path as NamedNode}
                                 class="font-medium text-sm hover:text-primary hover:underline cursor-pointer truncate"
-                                onclick={() => onpathclick?.(shape.path as NamedNode)}
+                                onclick={() => navigateToPredicate?.(shape.path as NamedNode)}
                             >
                                 {pathInfo.label}
                             </IriTooltip>
